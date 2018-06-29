@@ -27,6 +27,14 @@ daily.txt - every day (see roadmap 4)
 
 # prerequisites
 cpan:
+
 install Config::IniFiles
+
 install XML::LibXML::Reader
+
 install XML::RSS
+
+install DateTime
+
+install DateTime::Format::Duration;
+
