@@ -1,0 +1,6 @@
+text=Monday, %date%:
+- 10:30 am - Monthly women's meeting
+image=https://www.mydomain.com/img/mon.png
+time=100
+category=examples
+last=1

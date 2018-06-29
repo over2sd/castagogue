@@ -1,0 +1,7 @@
+text=Friday, %date%:
+- 7:30 am - Men's Prayer with Rabbi
+- 5:30 pm - Torah Study in the Fellowship Hall
+image=https://www.mydomain.com/img/fri.png
+time=100
+category=examples
+last=1
