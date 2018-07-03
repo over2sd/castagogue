@@ -8,6 +8,7 @@ use utf8;
 my $version = "0.001a";
 
 $|++; # Immediate STDOUT, maybe?
+print "[I] Castagogue v$version";
 
 use Getopt::Long;
 my $conffilename = 'config.ini';
@@ -31,7 +32,7 @@ GetOptions(
 );
 
 use lib "./modules/";
-# print "Loading modules...";
+print "\n[I] Loading modules...";
 
 require Sui; # My Data stores
 require Common;
@@ -54,7 +55,7 @@ sub openOutfile {
 	my $outputfilehandle;
 	if ($fn eq '-') { return *STDOUT; }
     open ($outputfilehandle, ">$fn") || ($fail = 1);
-	if ($fail) { print "[E] Dying of file error: $! Woe, I am slain!"; exit(-1); }
+	if ($fail) { print "\n[E] Dying of file error: $! Woe, I am slain!"; exit(-1); }
 	return $outputfilehandle;
 }
 
@@ -64,8 +65,8 @@ sub openOutfile {
 my $mainwindow = "placeholder";
 my $out = StatusBar->new(owner => $mainwindow)->prepare();
 my $rss = castRSS::prepare($rssfile,$out);
-use Data::Dumper;
-print "Now contains " . $#{$rss->{items}} . " items...";
+#use Data::Dumper;
+#print "Now contains " . $#{$rss->{items}} . " items...";
 #print $rss->as_string;
 my $error = castRSS::processRange($rss,$begin,$conclude);
 
