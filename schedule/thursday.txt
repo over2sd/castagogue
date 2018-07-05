@@ -1,3 +1,4 @@
+title=Friday Events
 text=Friday, %date%:
 - 7:30 am - Men's Prayer with Rabbi
 - 5:30 pm - Torah Study in the Fellowship Hall

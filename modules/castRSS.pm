@@ -99,7 +99,7 @@ sub processFile {
 	my $fn = shift;
 	$fn = "schedule/$fn";
 	my $v = main::howVerbose(); 
-	if ( $v > 1) { print " $fn"; }
+	if ( $v > 2) { print " $fn"; }
 	my @items = [];
 	unless ( -e $fn ) {
 		print "-" if ($v > 0);
@@ -138,6 +138,8 @@ sub processDay {
 	$fn = substr($fn,0,-5) . ($d->week_of_month() % 2 ? "odd" : "even") . ".txt"; # check dayeven/dayodd.txt
 	processFile($fn);
 	$fn = $d->strftime("date%d.txt"); # check date0#.txt (same date each month events)
+	processFile($fn);
+	$fn = $d->ymd() . ".txt"; # check YYYY-MM-DD.txt (events generated for this date specifically)
 	processFile($fn);
 	# check for today.txt
 	# process daily if present

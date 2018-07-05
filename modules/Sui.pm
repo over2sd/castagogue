@@ -55,10 +55,102 @@ sub expandMe {
 # replace date
 	my $dstr = $date->strftime("%B %d, %Y");
 	$text =~ s/%date%/$dstr/;
+	my $gogue = FIO::config('Main','orgname') or "Missing Name";
+	$text =~ s/%name%/$gogue/;
 	return $text;
 }
 print ".";
 
+package RItem; # RSS Items
+=head2 RItem
+
+RSS Item. Stores information for an item to be published to an RSS feed object.
+
+=head3 Usage
+
+  my $item = RItem->new(title => "Item Title", text => "Item description", link => "http://www.url.com/", cat => "news", time => "1600", date => "Mon, 06 Sep 2010");
+
+=cut
+sub new {
+	my ($class,%profile) = @_;
+	my $self = {
+# 	dexmod nat deflect notff nottch miscmod speed conscore maxhp init );
+
+		title => ($profile{title} or "Unnamed"),
+		text => ($profile{text} or "Description Missing"),
+		link => ($profile{link} or "about:blank"),
+		cat => ($profile{cat} or "general"),
+		time => ($profile{time} or "1200"),
+		date => ($profile{date} or "Mon, 01 Jan 2018"),
+	};
+	bless $self, $class;
+	return $self;
+}
+
+sub get {
+	my ($self,$key) = @_;
+	defined $key or return undef;
+	return $self->{$key};
+}
+
+sub set {
+	my ($self,$key,$value) = @_;
+	defined $value and defined $key or return undef;
+	$self->{$key} = $value;
+	return $self->{$key};
+}
+
+sub text {
+	my ($self,$text) = @_;
+	defined $text or return $self->get('text');
+	return $self->set('text',$text);
+}
+
+sub name {
+	my ($self,$text) = @_;
+	defined $text or return $self->get('title');
+	return $self->set('title',$text);
+}
+
+sub title {
+	my ($self,$text) = @_;
+	defined $text or return $self->get('title');
+	return $self->set('title',$text);
+}
+
+sub link {
+	my ($self,$text) = @_;
+	defined $text or return $self->get('link');
+	return $self->set('link',$text);
+}
+
+sub cat {
+	my ($self,$text) = @_;
+	defined $text or return $self->get('cat');
+	return $self->set('cat',$text);
+}
+
+sub category {
+	my ($self,$text) = @_;
+	defined $text or return $self->get('cat');
+	return $self->set('cat',$text);
+}
+
+sub time {
+	my ($self,$text) = @_;
+	defined $text or return $self->get('time');
+	return $self->set('time',$text);
+}
+
+
+sub date {
+	my ($self,$text) = @_;
+	defined $text or return $self->get('date');
+	return $self->set('date',$text);
+}
+print ".";
+
+package Sui;
 
 # Status hashes
 sub getStatHash { my $typ = shift; return (wat=>($typ eq 'man' ? "Read" : "Watch") . "ing",onh=>"On-hold",ptw=>"Plan to " . ($typ eq 'man' ? "Read" : "Watch"),com=>"Completed",drp=>"Dropped"); } # could be given i18n
@@ -83,6 +175,7 @@ sub getOpts {
 ##		'002' => ['x',"Foreground color: ",'fgcol',"#00000"],
 ##		'003' => ['x',"Background color: ",'bgcol',"#CCCCCC"],
 		'004' => ['c',"Errors are fatal",'fatalerr'],
+		'005' => ['t',"Name of organization",'orgname'],
 		
 		'030' => ['l',"User Interface",'UI'],
 		'032' => ['n',"Shorten names to this length",'namelimit',20,15,100,1,10],
@@ -135,6 +228,7 @@ sub getDefaults {
 		['Main','savepos',1],
 		['UI','notabs',1],
 		['Font','bigent',"Verdana 24"],
+		['Main','orgname',"The Unnamed Congregation"],
 	);
 }
 print ".";
