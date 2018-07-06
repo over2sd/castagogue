@@ -5,17 +5,18 @@ use warnings;
 use utf8;
 
 # castagogue
-my $version = "0.001a";
+my $version = "0.005a";
 
 $|++; # Immediate STDOUT, maybe?
-print "[I] Castagogue v$version";
+print "[I] Castagogue v$version is running.";
+flush STDOUT;
 
 use Getopt::Long;
 my $conffilename = 'config.ini';
 my $debug = 0; # verblevel
 sub howVerbose { return $debug; }
 
-my $outfile = '-';
+my $outfile = 'rssnew.xml';
 my $rssfile = 'rss.xml';
 my $begin = 'today';
 my $conclude = 'tomorrow';
@@ -37,7 +38,7 @@ print "\n[I] Loading modules...";
 require Sui; # My Data stores
 require Common;
 require FIO;
-use NoGUI;
+require NoGUI;
 require castRSS; # castagogue RSS functions
 
 FIO::loadConf($conffilename);
@@ -68,7 +69,7 @@ my $rss = castRSS::prepare($rssfile,$out);
 #use Data::Dumper;
 #print "Now contains " . $#{$rss->{items}} . " items...";
 #print $rss->as_string;
-my $error = castRSS::processRange($rss,$begin,$conclude);
-
+my $error = castRSS::processRange($rss,$begin,$conclude,$out);
+$rss->save($outfile);
 FIO::saveConf();
 1;

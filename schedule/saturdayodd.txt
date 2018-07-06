@@ -1,0 +1,10 @@
+title=Odd Saturday Events
+text=%name% Events for Sunday, %date%:
+- 1:30 pm - Childrens's Prayer Hour
+  - indented line
+	- tabbed line
+image=https://www.mydomain.com/img/sunodd.png
+time=100
+	category=examples
+last=1
+
