@@ -61,6 +61,14 @@ sub expandMe {
 }
 print ".";
 
+sub getTZ {
+	my $t = FIO::config('Main','tz'); # pull timezone from config
+	my $s = ($t<0?"-":"+"); # save the sign
+	$t = ($t<0?-100:100) * $t; # convert offset to hours
+	return sprintf("%s%04i",$s,$t); # return TZ offset as nice string.
+}
+print ".";
+
 # Status hashes
 sub getStatHash { my $typ = shift; return (wat=>($typ eq 'man' ? "Read" : "Watch") . "ing",onh=>"On-hold",ptw=>"Plan to " . ($typ eq 'man' ? "Read" : "Watch"),com=>"Completed",drp=>"Dropped"); } # could be given i18n
 sub getStatOrder { return qw( wat onh ptw com drp ); }
@@ -81,10 +89,11 @@ sub getOpts {
 	my %opts = (
 		'000' => ['l',"General",'Main'],
 		'001' => ['c',"Save window positions",'savepos'],
-##		'002' => ['x',"Foreground color: ",'fgcol',"#00000"],
-##		'003' => ['x',"Background color: ",'bgcol',"#CCCCCC"],
+##		'002' => ['x',"Foreground color ",'fgcol',"#00000"],
+##		'003' => ['x',"Background color ",'bgcol',"#CCCCCC"],
 		'004' => ['c',"Errors are fatal",'fatalerr'],
 		'005' => ['t',"Name of organization",'orgname'],
+		'006' => ['n',"Time Zone Offset (from GMT)",'tz'],
 		
 		'030' => ['l',"User Interface",'UI'],
 		'032' => ['n',"Shorten names to this length",'namelimit',20,15,100,1,10],
@@ -138,6 +147,7 @@ sub getDefaults {
 		['UI','notabs',1],
 		['Font','bigent',"Verdana 24"],
 		['Main','orgname',"The Unnamed Congregation"],
+		['Main','tz',-6],
 	);
 }
 print ".";

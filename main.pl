@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 # castagogue
-my $version = "0.005a";
+my $version = "0.006a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] Castagogue v$version is running.";

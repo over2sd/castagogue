@@ -1,4 +1,4 @@
-title=Odd Saturday Events
+title=Odd Sunday Events
 text=%name% Events for Sunday, %date%:
 - 1:30 pm - Childrens's Prayer Hour
   - indented line

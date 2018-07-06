@@ -1,6 +1,9 @@
 package Common;
 print __PACKAGE__;
 
+use Exporter qw(import);
+our @EXPORT = qw( infMes getColorsbyName );
+
 my @obj = @{ Sui::passData('objectionablecontent') };
 my %objindex;
 @objindex{@obj} = (0..$#obj);
@@ -60,7 +63,7 @@ sub expandMask { # returns array
 
 sub fmod { # useful for working with fractional values, since x%y may return int.
 	my ($x,$y,$both) = @_;
-	die "Divide by zero!" unless $y;
+	errSpecial("db0e") unless $y; # death by zero division
 	my $q = floor($x/$y);
 	my $r = $x - ($y*$q);
 	return ($both ? ($r,$q) : $r); # mostly, we'll just want the remainder
@@ -386,10 +389,25 @@ sub errorOut {
 		($fatal ? warn errColor($error,$color,$nl) : print errColor($error,$color,$nl));
 	} elsif ($error =~ m/^\n?\[I\]/) { # information
 		$color = ($color ? 2 : 0);
-		print errColor($error . "\n",$color,$nl);
+		my $lf = (($args{continues} or 0) ? "" : "\n");
+		print errColor($error . $lf,$color,$nl);
 	} else { # unformatted (malformed) error
 		print $error;
 	}
+}
+print ".";
+
+sub errSpecial {
+	my ($error) = @_;
+	if ($error eq "db0e") {
+		Common::errorOut('inline',0,color => 1, fatal => 1, string => "\n[E] You have attempted to divide by 0 " . lineNo());
+	}
+}
+print ".";
+
+sub infMes {
+	my ($text,%args) = @_;
+	Common::errorOut('inline',0,color => 1, fatal => 0, string => "\n[I] $text", %args);
 }
 print ".";
 

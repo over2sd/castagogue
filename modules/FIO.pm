@@ -71,7 +71,7 @@ print ".";
 sub loadConf {
 	my $configfilename = shift || "config.ini";
 	$cfg->SetFileName($configfilename);
-	Common::errorOut('inline',0,color => 1, fatal => 0, string => "\n[I] Seeking configuration file...");
+	Common::errorOut('inline',0,color => 1, fatal => 0, string => "\n[I] Seeking configuration file...", continues => 1);
 	if ( -s $configfilename ) {
 		print "found. Loading...";
 		$cfg->ReadConfig();

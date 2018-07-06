@@ -25,7 +25,7 @@ sub prepare {
 
 sub push {
 	my ($self,$text) = @_;
-	print "$text\n"
+	print "$text";
 }
 print ".";
 

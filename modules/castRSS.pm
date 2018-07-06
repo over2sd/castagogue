@@ -5,20 +5,7 @@ use strict;
 use warnings;
 use FIO qw( config );
 use RItem;
-
-sub beforeIt {
-	my ($d1,$d2) = @_;
-#print "Comparing " . $d1->ymd() . " to " . $d2->ymd() . ":";
-	if ($d1->year() > $d2->year()) {
-		return 0;
-	} elsif ($d1->month() > $d2->month()) {
-		return 0;
-	} elsif ($d1->day() > $d2->day()) {
-		return 0;
-	} else {
-		return 1;
-	}
-}
+use Common qw( infMes );
 
 =item prepare()
 	Given an RSS feed filename ($fn) and an output (file or STDOUT ($output)), creates an RSS object and cleans out items that have already passed.
@@ -40,7 +27,7 @@ sub prepare {
 	my $basecol = ($termcolor ? Common::getColorsbyName("base") : "");
 	my $pccol = ($termcolor ? Common::getColorsbyName("cyan") : "");
 	my $npccol = ($termcolor ? Common::getColorsbyName("ltblue") : "");
-	#print "Contains " . $#{$rss->{items}} . " items...";
+	print "Contains " . $#{$rss->{items}} . " items...";
 	my $itemno = 0;
 	my $nextid = FIO::config('Main','nextid');
 	for my $i (@{$rss->{items}}) {
@@ -50,8 +37,8 @@ sub prepare {
 		if ($nextid < $i->{'guid'}) {
 			$nextid = $i->{'guid'} + 0;
 		}
-		if (beforeIt($start,$end)) {
-			print "\n[I] Deleting old item from $date.";
+		if ($start < $end) {
+			infMes("Deleting old item from $date.");
 			splice(@{$rss->{items}},$itemno,1);
 		}
 		$itemno++;
@@ -157,7 +144,7 @@ sub processFile {
 				} elsif ($k eq "last") { # the end of the post record
 					$descact = 0;
 					push(@items,$ti); # store record
-					last if( $2 eq "1"); # if last item, exit loop
+					last if(!defined $2 || $2 eq "1"); # if last item, exit loop
 					print $fn;
 					$ti = RItem->new(date => "$rdate"); # start new record, in case there are more items in this file
 				} else { # Oops! Error.
@@ -199,9 +186,7 @@ sub processDay {
 	foreach my $i (@items) { # after pulling events, put them in RSS objects
 		(ref($i) eq "RItem") || next;
 #	my ($r,$desc,$url,$pdt,$cat,$title,$pub) = @_;
-		$i->time =~ /(\d\d)(\d\d)/;
-		my $time = $i->date . " $1:$2:00 " . $d->strftime("%z");
-		makeItem($r,$i->text,$i->link,$d,$i->cat,$i->name,$time);
+		makeItem($r,$i->text,$i->link,$d,$i->cat,$i->name,$i->timestamp);
 	}
 	return 0;
 }
@@ -247,9 +232,9 @@ sub processRange {
 				time_zone => 'floating',
 			);
 	}
-	beforeIt($ds,$dp) && die "I cannot go backward in time. Sorry.\n";
-	print "\n[I] Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":";
-	while (beforeIt($dp,$ds)) {
+	($ds < $dp) && die "I cannot go backward in time. Sorry.\n";
+	infMes("Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":");
+	while ($dp < $ds) {
 		processDay($dp,$r,$out);
 		$dp = $dp + DateTime::Duration->new( days=> 1 );
 	}
