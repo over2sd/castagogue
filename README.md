@@ -38,3 +38,4 @@ install DateTime
 
 install DateTime::Format::Duration;
 
+install WWW::Mechanize

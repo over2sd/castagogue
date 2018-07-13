@@ -105,6 +105,10 @@ sub getOpts {
 		'041' => ['x',"Rule color: ",'rulecolor',"#003"],
 		'042' => ['n',"How many rows per column in file lists?",'filerows',10,3,30,1,5],
 
+		'100' => ['l',"Network",'Net'],
+		'101' => ['c',"Save bandwidth by saving iamge thumbnails",'savethumbs'],
+		'102' => ['t',"Thumbnail Directory",'thumbdir'],
+
 		'750' => ['l',"Fonts",'Font'],
 		'754' => ['f',"Tab font/size: ",'label'],
 		'751' => ['f',"General font/size: ",'body'],
@@ -148,6 +152,8 @@ sub getDefaults {
 		['Font','bigent',"Verdana 24"],
 		['Main','orgname',"The Unnamed Congregation"],
 		['Main','tz',-6],
+		['Net','savethumbs',1],
+		['Net','thumbdir',"itn"],
 	);
 }
 print ".";

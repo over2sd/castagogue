@@ -120,5 +120,38 @@ sub getFileName {
 }
 print ".";
 
+sub readFile {
+	my $fh;
+	my ($fn,$stat) = @_;
+	unless (open($fh,"<$fn")) { # open file
+		$stat and $stat->push("\n[E] Error opening file: $!" );
+		config('Main','fatalerr') && die "I am slain by unopenable file $fn because $!";
+		return [];
+	} else {
+		$stat and $stat->push("Loaded $fn...");
+		chomp (my @lines = <$fh>);
+		close($fh);
+		return @lines;
+	}
+}
+print ".";
+
+sub Webget {
+	my ($uri,$lfn,$out) = @_;
+	require WWW::Mechanize;
+	my $getter = WWW::Mechanize->new;
+	$getter->get($uri);
+	if ($getter->success()) {
+		$out and $out->push("Saving $lfn...");
+		$getter->save_content($lfn);
+		return 0;
+	} else {
+		$out and $out->push("$lfn could not be retrieved.");
+		return 1;
+	}
+	
+}
+print ".";
+
 print " OK; ";
 1;

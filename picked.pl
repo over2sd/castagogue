@@ -1,14 +1,18 @@
-#!/usr/bin/perl
+﻿#!/usr/bin/perl
 use strict;
 use warnings;
 #use diagnostics;
 use utf8;
 
-# castagogue
-my $version = "0.007a";
+# castapic
+#######  This will be an app that takes a file of image URLs and lets the user type in a description for each, then save those descriptions into another file.
+####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
+
+my $PROGRAMNAME = "Castapic";
+my $version = "0.001a";
 
 $|++; # Immediate STDOUT, maybe?
-print "[I] Castagogue v$version is running.";
+print "[I] Castapic v$version is running.";
 flush STDOUT;
 
 use Getopt::Long;
@@ -16,18 +20,12 @@ my $conffilename = 'config.ini';
 my $debug = 0; # verblevel
 sub howVerbose { return $debug; }
 
-my $outfile = 'rssnew.xml';
-my $rssfile = 'rss.xml';
-my $begin = 'today';
-my $conclude = 'tomorrow';
-my $nextid = 1;
+my $outfile = 'default.ini';
+my $infile = 'ulist.txt';
 
 GetOptions(
 	'outputfile|o=s' => \$outfile,
-	'rssfile|i=s' => \$rssfile,
-	'startdate|f=s' => \$begin,
-	'enddate|t=s' => \$conclude,
-	'nextid|g=i' => \$nextid,
+	'infile|i=s' => \$infile,
 	'conf|c=s' => \$conffilename,
 	'verbose|v=i' => \$debug,
 );
@@ -38,12 +36,10 @@ print "\n[I] Loading modules...";
 require Sui; # My Data stores
 require Common;
 require FIO;
-require NoGUI;
-require castRSS; # castagogue RSS functions
+require PGUI; # Prima GUI
 
 FIO::loadConf($conffilename);
 FIO::config('Debug','v',howVerbose());
-FIO::config('Main','nextid',$nextid);
 # other defaults:
 foreach (Sui::getDefaults()) {
 	FIO::config(@$_) unless defined FIO::config($$_[0],$$_[1]);
@@ -62,15 +58,11 @@ sub openOutfile {
 
 
 
-#my $out = openOutfile($outfile);
-my $mainwindow = "placeholder";
-my $out = StatusBar->new(owner => $mainwindow)->prepare();
-my $rss = castRSS::prepare($rssfile,$out);
-#use Data::Dumper;
-#print "Now contains " . $#{$rss->{items}} . " items...";
-#print $rss->as_string;
-my $error = castRSS::processRange($rss,$begin,$conclude,$out);
-print "Now contains " . $#{$rss->{items}} . " items...";
-$rss->save($outfile);
-FIO::saveConf();
+use Prima qw(Application Buttons MsgBox FrameSet Edit );
+my $gui = PGK::createMainWin($PROGRAMNAME,$version,800,500);
+my $text = $$gui{status};
+PGUI::populateMainWin(undef,$gui,0);
+$text->push("Ready.");
+Prima->run();
+
 1;
