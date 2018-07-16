@@ -184,5 +184,100 @@ sub poll {
 }
 print ".";
 
+package RRGroup; # Groups for random rotation
+# A monthly rotation may be achieved with an RRGroup of 30/31/61 rows
+=head2 RRGroup
+
+A group for storing randomizeable lists containing names and descriptions in rows for easy manipulation.
+	
+=head3 Usage
+
+ my $group = RRGroup->new(order => "striped");
+ my ($index,$length) = $group->add(0,{name => "Tom Swift", age => 32},{name => "Harry Houdini", age => 27},{name => "John Smith", address => "1 Any St."});
+
+=head3 Methods
+
+=cut
+sub new {
+	my ($class,%profile) = @_;
+	my $order = ${RRGroup->order(-2)}{$profile{order}}; # given value might need conversion.
+	my $self = {
+		order => ($order or 0),
+		rows => ( $profile{rows} || []),
+	};
+	bless $self,$class;
+	return $self;
+}
+
+sub add { # add hashes to a row.
+	my ($self,$rownum,@rows) = @_;
+	my $r = $self->{rows}; # grab our list of rows
+	my $max = ($#$r < 0 ? 0 : $#$r); # find the highest available row
+	while ($max < $rownum) { # if higher than existing:
+		my $newrow = []; # add a new row, as user indicated desire for a higher row
+		push(@$r,$newrow); # push the new row into the list of rows
+		$max = $#$r; # update max, since we're about to use it
+	}
+	unless (defined $$r[$rownum]) { $$r[$rownum] = []; } # failsafe
+	$r = $$r[$rownum]; # row established. Use this row.
+	$max = ($#$r < 0 ? 0 : $#$r); # find the highest available row
+	my $length = 0;
+	for (my $i = 0; $i <= $#rows; $i++) {
+		my %tr;
+		foreach my $k (keys %{$rows[$i]}) {
+			$tr{$k} = ${$rows[$i]}{$k};
+		}
+		$length++;
+		push(@$r,\%tr);
+	}
+	return ($max,$length);
+}
+
+sub item {
+	my ($self,$rownum,$item) = @_;
+	return {error => -1} unless (defined $rownum && $rownum >= 0 && $rownum <= $self->rows()); # choke if not given a valid row.
+	return {error => -2} unless (defined $item && $item >= 0 && $item <= $self->items($rownum)); # choke if not given a valid item.
+	my @r = $self->row($rownum);
+	return %{$r[$item]}; # return the hash
+}
+
+sub items { # gets the number of items in a row
+	my ($self,$rownum) = @_;
+	return scalar($self->row($rownum));
+}
+
+sub order { # get or set the order
+	my ($self,$order) = @_;
+	my %values = ( "none" => 0, "striped" => 1, "grouped" => 2, "mixed" => 3,);
+	$order = ($values{$order} or $order);
+	return \%values if ($order == -2);
+	if ($order == -1) {
+		foreach my $k (keys %values) {
+			return $k if $values{$k} == $self{order}; # if given "-1", try to return the name of the order instead of its code value.
+		}
+		return "ERROR"; # prevent the order from being overwritten with -1 in case of invalid value.
+	}
+	$self{order} = int($order) if (defined $order);
+	return $self{order};
+}
+
+sub rows {
+	my $self = shift;
+	my $r = $self->{rows}; # grab our list of rows
+	return scalar(@{$r}); # number of rows.
+}
+
+sub row {
+	my ($self,$rownum) = @_;
+	my $r = $self->{rows}; # grab our list of rows
+	my $max = ($#$r < 0 ? 0 : $#$r); # find the highest available row
+	if ($max < $rownum) { # if higher than existing:
+		return []; # Just return an empty array. The user is responsible for not looping infinitely.
+	}
+	$r = $$r[$rownum]; # row established. Use this row.
+	return @{$r}; # if found, return the array of hashes.
+}
+print ".";
+
 print "OK; ";
 1;

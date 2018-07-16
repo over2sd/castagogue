@@ -113,7 +113,7 @@ print ".";
 sub saveDescs {
 	my ($fn,$hr) = @_;
 	use Data::Dumper;
-	print "If this were finished, I'd save the following data to rotate/$fn...";
+	print "If this were finished, I'd save the following data to lib/$fn...";
 	print Dumper $hr;
 	return 0;
 }
