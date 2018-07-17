@@ -1051,7 +1051,8 @@ sub switchToPanel {
 		print "[E] Panel $key not found.\n";
 		return -1;
 	}
-	$self->{pages}[$index]->bring_to_front() if defined $self->{pages}[$index];
+	$self->{pages}[$index]->bring_to_front() if defined $self->{pages}[$index]; # bring it to the front so the user can interact with it
+	$self->{pages}[$index]->{switchaction}($self->{pages}[$index]->{switchargs}) if defined $self->{pages}[$index]{switchaction}; # run whatever the user has defined as the "on switch to this page" action.
 	return 0;
 }
 
@@ -1085,6 +1086,20 @@ sub panel { # returns a handle for panel #n. Useful for setting backgrounds, etc
 	}
 	return $self->{pages}[$index] if defined $self->{pages}[$index];
 	return undef; # otherwise
+}
+
+sub setSwitchAction {
+	my ($self,$key,$action,@extra) = @_;
+	my $index = ${ $self->{order} }{$key} or -1;
+	$index = $key if ($index < 0 and $key + 1 eq 1 + $key);
+	if ($index < 0) {
+		print "[E] Panel $key not found.\n";
+		return -1;
+	}
+	if (defined $action and defined $self->{pages}[$index]) {
+		$self->{pages}[$index]->{switchaction} = $action;
+		$self->{pages}[$index]->{switchargs} = (\@extra or []);
+	}
 }
 
 package PGK;

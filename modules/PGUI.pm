@@ -17,11 +17,19 @@ PGUI - A module for Prima GUI elements
 
 A library of functions used to build and manipulate the program's Prima user interface elements.
 
+=head3 Functions
+
 =cut
 
 package PGUI;
 
 my @openfiles = [];
+
+=item tryLoadInput TARGET FILE PAUSEOBJ HASH SIZEOBJ
+
+Given a reset TARGET widget, a FILE name, a PAUSEOBJect containing a delay in the text field, a HASH in which to store 
+
+=cut
 
 sub tryLoadInput {
 	my ($resettarget,$fn,$pausebox,$hashr,$viewsize) = @_;
@@ -104,11 +112,17 @@ sub tryLoadInput {
 			$hitserver = 0;
 		}
 	}
-	my $of = $outbox->insert( InputLine => text => "prayers.txt", pack => { fill => 'x', expand => 1, },);
+	my $of = $outbox->insert( InputLine => text => "prayers.dsc", pack => { fill => 'x', expand => 1, },);
 	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 1, }, onClick => sub { my $ofn = $of->text; $outbox->destroy(); saveDescs($ofn,$hashr); });
 	$stat->push("Done.");
 }
 print ".";
+
+=item saveDescs FILE HASH
+
+Given a FILEname and a HASHref to a list of descriptions, converts the list into a format suitable for the group files the Ordering page will read.
+
+=cut
 
 sub saveDescs {
 	my ($fn,$hr) = @_;
@@ -118,6 +132,14 @@ sub saveDescs {
 	return 0;
 }
 print ".";
+
+=item resetDescribing TARGET
+
+Given a TARGET widget, generates the input boxes and list widgets needed to perform the Describing page's functions.
+Returns 0 on completion.
+Dies on error opening given directory.
+
+=cut
 
 sub resetDescribing {
 	my ($imgpage) = @_;
@@ -143,32 +165,115 @@ sub resetDescribing {
 		});
 	}
 	$delaybox->text("7");
+	return 0;
 }
+print ".";
+
+=item resetDescribing TARGET
+
+Given a TARGET widget, generates the list widgets needed to perform the Ordering page's functions.
+Returns 0 on completion.
+Dies on error opening library directory.
+
+=cut
+
+sub resetOrdering {
+	my ($args) = @_;
+	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	$ordpage->empty(); # start with a blank slate
+	my $odir = (FIO::config('Main','rotatedir') or "lib");
+	opendir(DIR,$odir) or die $!;
+	my @files = grep {
+		/\.rig$/ # only show rotational image group files.
+		&& -f "$odir/$_"
+		} readdir(DIR);
+	closedir(DIR);
+	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1} );
+	$lister->insert( Label => text => "Choose a file containing URLs:");
+	foreach my $f (@files) {
+		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
+#			tryLoadGroup($ordpage,$f);
+		});
+	}
+	my $op = labelBox($ordpage,"Ordering page not yet coded.",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+}
+print ".";
+
+=item populateMainWin DBH GUI REFRESH
+
+Given a DBHandle, a GUIset, and a value indicating whether or not to REFRESH the window, generates the objects that fill the main window.
+At this time, DBH may be undef.
+Returns 0 on successful completion.
+
+=cut
 
 sub populateMainWin {
 	my ($dbh,$gui,$refresh) = @_;
 	($refresh && (defined $$gui{pager}) && $$gui{pager}->destroy());
 	my $win = $$gui{mainWin};
-	my @tabs = qw( Describing Ordering); # TODO: generate dynamically
+	my @tabs = qw( Describing Grouping Ordering Publishing Scheduling ); # TODO: generate dynamically
 	my $pager = $win->insert( Pager => name => 'Pages', pack => { fill => 'both', expand => 1}, );
 	$pager->build(@tabs);
 	my $i = 1;
 	my $color = Common::getColors(11,1);
-	my $currpage; # placeholder
+	my $currpage = 0; # placeholder
+
 	# Image tab
-	my $imgpage = $pager->insert_to_page(0,VBox =>
+	my $imgpage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
 	);
 	resetDescribing($imgpage);
 
-	my $ranpage = $pager->insert_to_page(0,VBox =>
+	# Grouping tab
+	$color = Common::getColors(($i++ % 2 ? 0 : 6),1);
+	my $grppage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
 	);
+	my $gp = labelBox($grppage,"Grouping page not yet coded.",'g','H', boxfill => 'both', boxex => 1, labfill => 'x', labex => 1);
+# dispatcher proof of concept
+	my $tl = $gp->insert( Label => text => "1" );
+	sub increment_478924 { my $count = int($tl->text) + 1; $tl->text("$count"); }
+	$pager->setSwitchAction("Grouping",\&increment_478924);
+# end POC
+
+	# Ordering tab
+	$color = Common::getColors(($i++ % 2 ? 0 : 10),1);
+	my $ordpage = $pager->insert_to_page($currpage++,VBox =>
+		backColor => ColorRow::stringToColor($color),
+		pack => { fill => 'both', },
+	);
+	my $op = labelBox($ordpage,"Ordering page not yet coded.",'o','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+	$pager->setSwitchAction("Ordering",\&resetOrdering,$ordpage); # reload the description buttons whenever we switch to this page, in case the user made a new dsc file on the Describing tab.
+
+	# Publishing tab
+	$color = Common::getColors(($i++ % 2 ? 0 : 9),1);
+	my $pubpage = $pager->insert_to_page($currpage++,VBox =>
+		backColor => ColorRow::stringToColor($color),
+		pack => { fill => 'both', },
+	);
+	my $pp = labelBox($pubpage,"Publishing page not yet coded.",'r','H', boxfill => 'both', boxex => 1, labfill => 'x', labex => 1);
+
+	# Scheduling tab
+	$color = Common::getColors(($i++ % 2 ? 0 : 8),1);
+	my $schpage = $pager->insert_to_page($currpage++,VBox =>
+		backColor => ColorRow::stringToColor($color),
+		pack => { fill => 'both', },
+	);
+	my $sp = labelBox($schpage,"Scheduling page not yet coded.",'r','H', boxfill => 'x', boxex => 1, labfill => 'x', labex => 1);
+	$color = Common::getColors(($i++ % 2 ? 0 : 7),1);
 	$$gui{pager} = $pager;
+	return 0;
 }
 print ".";
+
+=item buildMenus GUI
+
+Given a GUIset, generates the menus this program will show on its menubar.
+Returns a reference to the menu array that Prima can use to build the menubar. 
+
+=cut
 
 sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 	my $gui = shift;
@@ -184,16 +289,38 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 }
 print ".";
 
+=item aboutBox TARGET
+
+Given a TARGET parent window, displays information about the program.
+Returns the return value of sayBox().
+
+=cut
+
 sub aboutBox {
 	my $target = shift;
-	sayBox($target,"$PROGRAMNAME $version\nThis program exists to allow you to preview images in a list of URLs, type your own descriptions of them, and save the description of each file with its URL in a library castagogue can use to populate randomized lists.\nI hope you enjoy it.");
+	return sayBox($target,Sui::aboutMeText());
 }
+
+=item sayBox PARENT TEXT
+
+Given a PARENT window and a TEXT to display, generates a simple message box to show the text to the user.
+Returns 0.
+
+=cut
 
 sub sayBox {
 	my ($parent,$text) = @_;
 	Prima::MsgBox::message($text,owner=>$parent);
+	return 0;
 }
 print ".";
+
+=item callOptBox [GUI]
+
+Given a GUIset, generates an options dialog.
+Returns the return value of the option box function.
+
+=cut
 
 sub callOptBox {
 	my $gui = shift || getGUI();

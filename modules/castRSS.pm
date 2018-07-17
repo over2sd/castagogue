@@ -120,7 +120,7 @@ sub processFile {
 			while (my $line = <$fh>) { # read lines
 				chomp $line;
 				$line =~ m/(.*?\=)?(.*)/; # find keywords
-				my $k = (defined $1 ? substr($1,0,-1) : "---");
+				my $k = (defined $1 ? substr($1,0,-1) : "---"); # remove the equals sign from the keyword, or mark the line as a continued text line
 				$k =~ s/\s//g; # no whitespace in keywords, please
 				if ($k eq "text") { # for each keyword, store data in hash
 					$descact = 1;
@@ -140,6 +140,9 @@ sub processFile {
 					$descact = 0;
 				} elsif ($k eq "cat" or $k eq "category") { # the category for the post
 					$ti->category($2);
+					$descact = 0;
+				} elsif ($k eq "group") { # allow the use of a group tag, which will be expanded to fill the title, description, and image fields of the item automatically
+					Sui::expandGroup($2,$d,$ti);
 					$descact = 0;
 				} elsif ($k eq "last") { # the end of the post record
 					$descact = 0;

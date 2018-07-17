@@ -61,6 +61,17 @@ sub expandMe {
 }
 print ".";
 
+=item expandGroup()
+	Expand text pulled from a group ($groupid) with replacements of keywords, using a dateTime ($date) and put them in an RItem ($item).
+	Returns altered input.
+=cut
+sub expandGroup{
+	my ($groupid,$d,$item) = @_;
+	my $parsed = expandMe($raw,$d);
+	die "expandGroup is on the developer's TODO list.\nIf you'd like to help, check out the project's GitHub repo at http://github.com/over2sd/castagogue.";
+}
+print ".";
+
 sub getTZ {
 	my $t = FIO::config('Main','tz'); # pull timezone from config
 	my $s = ($t<0?"-":"+"); # save the sign
@@ -94,6 +105,7 @@ sub getOpts {
 		'004' => ['c',"Errors are fatal",'fatalerr'],
 		'005' => ['t',"Name of organization",'orgname'],
 		'006' => ['n',"Time Zone Offset (from GMT)",'tz'],
+		'007' => ['t',"Roational Image Group files live here",'rotatedir'],
 		
 		'030' => ['l',"User Interface",'UI'],
 		'032' => ['n',"Shorten names to this length",'namelimit',20,15,100,1,10],
@@ -183,6 +195,10 @@ sub poll {
 	$object->poll($input);
 }
 print ".";
+
+sub aboutMeText {
+	return "$PROGRAMNAME $version\nThis program exists to allow you to preview images in a list of URLs, type your own descriptions of them, and save the description of each file with its URL in a library castagogue can use to populate randomized lists.\nI hope you enjoy it.";
+}
 
 package RRGroup; # Groups for random rotation
 # A monthly rotation may be achieved with an RRGroup of 30/31/61 rows

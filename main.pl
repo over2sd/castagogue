@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 # castagogue
-my $version = "0.008a";
+my $version = "0.009a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] Castagogue v$version is running.";
@@ -41,6 +41,9 @@ require FIO;
 require NoGUI;
 require castRSS; # castagogue RSS functions
 
+# Proof of concept for the Random Rotation Groups objects
+# Not for production.
+
 my $group = RRGroup->new(order => "striped");
 my ($index,$length) = $group->add(0,{name => "Tom Swift", age => 32},{name => "Harry Houdini", age => 27},{name => "John Smith", address => "1 Any St."});
 print "Put $length items at index $index of row 0.\n";
@@ -52,6 +55,8 @@ print $group->order(-1);
 print " = " . $group->order() . "\n";
 my %i = $group->item(0,1);
 print "Contains " . $group->rows() . " rows. The first row contains " . $group->items(0) . " items. Second item in the row: " . %i->{name} . "=" . %i->{age} . "!\n";
+
+### End of test code ###
 
 FIO::loadConf($conffilename);
 FIO::config('Debug','v',howVerbose());
