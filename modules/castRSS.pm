@@ -36,11 +36,12 @@ sub prepare {
 		my $end = DateTime->now;
 		my $start = DateTime::Format::DateParse->parse_datetime( $date );
 		if ($nextid < hex($i->{'guid'})) {
-			$nextid = hex($i->{'guid'}) + 0;
+			$nextid = hex($i->{'guid'}) + 1;
 		}
 		if ($purging && $start < $end) {
 			infMes("Deleting old item from $date.",continues => 1);
 			splice(@{$rss->{items}},$itemno,1);
+			print " (" . $#{$rss->{items}} . " left) ";
 		}
 		$itemno++;
     }

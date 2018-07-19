@@ -4,6 +4,7 @@
 
 # data:
 schedule/*day.txt
+schedule/20*-*-*.txt
 itn/
 #lib/
 ulist.txt

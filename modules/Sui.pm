@@ -55,6 +55,8 @@ sub expandMe {
 # replace date
 	my $dstr = $date->strftime("%B %d, %Y");
 	$text =~ s/%date%/$dstr/;
+	$dstr = $date->strftime("%A");
+	$text =~ s/%weekday%/$dstr/;
 	my $gogue = FIO::config('Main','orgname') or "Missing Name";
 	$text =~ s/%name%/$gogue/;
 	return $text;
@@ -108,6 +110,7 @@ sub getOpts {
 
 		'020' => ['l',"File",'Disk'],
 		'021' => ['t',"Rotational Image Group files live here",'rotatedir'],
+		'022' => ['c',"Keep nextID across sessions",'persistentnext'],
 		'025' => ['c',"Purge old RSS items when loading",'purgeRSS'],
 		
 		'030' => ['l',"User Interface",'UI'],

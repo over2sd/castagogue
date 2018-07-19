@@ -39,6 +39,18 @@ sub config {
 }
 print ".";
 
+sub cfgrm {
+	my ($section,$key) = @_;
+		if (defined $cfg->val($section,$key,undef)) {
+			my $rv = $cfg->val($section,$key,undef);
+			$cfg->setval($section,$key,undef);
+			return $rv; # return the old value instead of success/failure
+		} else {
+			return undef;
+		}
+}
+print ".";
+
 sub validateConfig { # sets config values for missing required defaults
 	my %defaults = (
 		"width" => 480,

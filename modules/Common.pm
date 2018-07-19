@@ -247,6 +247,18 @@ sub indexOrder {
 }
 print ".";
 
+=item shorten TEXT MAXLENGTH POSTLENGTH
+
+Given a string TEXT and two integers MAXLENGTH for the shortened length and POSTLENGTH for the number of characters after the ellipsis,
+shortens a string by inserting ellipsis into it.
+Returns a shortened STRING.
+
+ shorten("Thomas Edward Robinson",15); 							      # returns Thomas Edwa... (default endlength of 7 requires a max length of at least 17 to not leave the end off)
+ shorten("Ozymandius the Magnificent, Gracious, and Longwinded,20,3); # returns Ozymandius the...ded
+ shorten("The Great and Powerful Oz",20,5); 						  # returns The Great an...ul Oz
+
+=cut
+
 sub shorten {
 	my ($text,$len,$endlen) = @_;
 	return $text unless (defined $text and length($text) > $len); # don't do anything unless text is too long.
@@ -260,9 +272,8 @@ sub shorten {
 		warn "Shortening string of length " . length($text) . " ($text) to $len does not make sense. Skipping.\n";
 		return $text;
 	}
-	my $part1 = substr($text,0,$part1length); # part before ...
-	my $part2 = substr($text,-$part2length); # part after ...
-	$text = "$part1...$part2"; # strung together with ...
+	my $part2 = ($part2length ? substr($text,-$part2length) : ""); # part after ...
+	$text = sprintf("%.${part1length}s...$part2",$text); # strung together with ...
 	return $text;
 }
 print ".";
@@ -562,7 +573,7 @@ print ".";
 sub RSSclean {
 my $in = shift;
 	$in =~ s/\015\012?/\012/g; # CR or CRLF to LF
-	$in =~ s/&(?!(?:[a-zA-Z0-9]+|#\d+);)/&amp;/g; # Lonely Ampersand
+#	$in =~ s/&(?!(?:[a-zA-Z0-9]+|#\d+);)/&amp;/g; # Lonely Ampersand
 	return $in;
 }
 print ".";

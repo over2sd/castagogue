@@ -5,10 +5,11 @@ use warnings;
 use utf8;
 
 # castagogue
-my $version = "0.010a";
+my $PROGNAME = "Castagogue";
+my $version = "0.011a";
 
 $|++; # Immediate STDOUT, maybe?
-print "[I] Castagogue v$version is running.";
+print "[I] $PROGNAME v$version is running.";
 flush STDOUT;
 
 use Getopt::Long;
@@ -21,6 +22,7 @@ my $rssfile = 'rss.xml';
 my $begin = 'today';
 my $conclude = 'tomorrow';
 my $nextid = 1;
+my $helpme = 0;
 
 GetOptions(
 	'outputfile|o=s' => \$outfile,
@@ -30,7 +32,22 @@ GetOptions(
 	'nextid|g=i' => \$nextid,
 	'conf|c=s' => \$conffilename,
 	'verbose|v=i' => \$debug,
+	'usage|h' => \$helpme,
 );
+
+if ($helpme) {
+	print "$PROGNAME [args]:
+   --outputfile -o <filename>: Use this output file (for writing RSS feed)
+   --rssfile -i <filename>:    Use this input file (for channel name, etc.)
+   --startdate -f <date>:      Start processing from YYYYMMDD
+   --enddate -t <date>:	       Stop processing after YYYYMMDD
+   --nextid -g <integer>:      Use this as the next GUID in the feed
+   --conf -c <filename>:       Read this configuration file
+   --verbose -v                Be verbose
+   --usage -h                  Display this useful message
+	";
+	exit(0);
+}
 
 use lib "./modules/";
 print "\n[I] Loading modules...";
@@ -81,10 +98,12 @@ my $mainwindow = "placeholder";
 my $out = StatusBar->new(owner => $mainwindow)->prepare();
 my $rss = castRSS::prepare($rssfile,$out);
 #use Data::Dumper;
-#print "Now contains " . $#{$rss->{items}} . " items...";
 #print $rss->as_string;
 my $error = castRSS::processRange($rss,$begin,$conclude,$out);
-print "Now contains " . $#{$rss->{items}} . " items...";
+print "\nNow contains " . $#{$rss->{items}} . " items...";
+# TODO: Update pubDate for feed/channel
 $rss->save($outfile);
+unless (FIO::config('Disk','persistentnext')) {
+	print "nextID was " . FIO::cfgrm('Main','nextid',undef); } # reset nextID if we want to get it from the file each time.
 FIO::saveConf();
 1;
