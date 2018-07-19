@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 # castagogue
-my $version = "0.009a";
+my $version = "0.010a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] Castagogue v$version is running.";
@@ -44,18 +44,15 @@ require castRSS; # castagogue RSS functions
 # Proof of concept for the Random Rotation Groups objects
 # Not for production.
 
-my $group = RRGroup->new(order => "striped");
+my $group = RRGroup->new(order => "mixed");
 my ($index,$length) = $group->add(0,{name => "Tom Swift", age => 32},{name => "Harry Houdini", age => 27},{name => "John Smith", address => "1 Any St."});
-print "Put $length items at index $index of row 0.\n";
+#print "Put $length items at index $index of row 0.\n";
 ($index,$length) = $group->add(1,{place => "Boston", day => 32},{west => "East", up => "down"});
-print "Put $length items at index $index of row 1.\n";
+#print "Put $length items at index $index of row 1.\n";
 ($index,$length) = $group->add(0,{alf => "bet"});
-print "Put $length items at index $index of row 0.\n";
-print $group->order(-1);
-print " = " . $group->order() . "\n";
+#print "Put $length items at index $index of row 0.\n";
 my %i = $group->item(0,1);
-print "Contains " . $group->rows() . " rows. The first row contains " . $group->items(0) . " items. Second item in the row: " . %i->{name} . "=" . %i->{age} . "!\n";
-
+print "Contains " . $group->rows() . " rows. The first row contains " . $group->items(0) . " items. Second item in the row: " . $i{name} . "=" . $i{age} . "!\n";
 ### End of test code ###
 
 FIO::loadConf($conffilename);

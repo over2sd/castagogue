@@ -30,15 +30,16 @@ sub prepare {
 	print "Contains " . $#{$rss->{items}} . " items...";
 	my $itemno = 0;
 	my $nextid = FIO::config('Main','nextid');
+	my $purging = (FIO::config('Disk','purgeRSS') or 0); # only delete old RSS items if the user wants it done.
 	for my $i (@{$rss->{items}}) {
 		my $date = qq{$i->{'pubDate'}};
 		my $end = DateTime->now;
 		my $start = DateTime::Format::DateParse->parse_datetime( $date );
-		if ($nextid < $i->{'guid'}) {
-			$nextid = $i->{'guid'} + 0;
+		if ($nextid < hex($i->{'guid'})) {
+			$nextid = hex($i->{'guid'}) + 0;
 		}
-		if ($start < $end) {
-			infMes("Deleting old item from $date.");
+		if ($purging && $start < $end) {
+			infMes("Deleting old item from $date.",continues => 1);
 			splice(@{$rss->{items}},$itemno,1);
 		}
 		$itemno++;
@@ -68,7 +69,7 @@ sub getGUID {
 sub makeItem {
 	my ($r,$desc,$url,$pdt,$cat,$title,$pub) = @_;
 	my $pds = $pdt->strftime("%a, %d %b %Y %T %z");
-	my $gi = getGUID();
+	my $gi = sprintf("%04x",getGUID());
 	$r->add_item(
 		title		=> ("$title" or qq{$pdt->day_name}),
 		link		=> "$url",

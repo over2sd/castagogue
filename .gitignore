@@ -3,12 +3,11 @@
 *.pnps
 
 # data:
-schedule/monday.txt
-schedule/tuesday.txt
-schedule/wednesday.txt
-schedule/friday.txt
+schedule/*day.txt
 itn/
+#lib/
 ulist.txt
+rssnew.xml
 
 !Build/
 .last_cover_stats

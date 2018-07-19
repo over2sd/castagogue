@@ -105,7 +105,10 @@ sub getOpts {
 		'004' => ['c',"Errors are fatal",'fatalerr'],
 		'005' => ['t',"Name of organization",'orgname'],
 		'006' => ['n',"Time Zone Offset (from GMT)",'tz'],
-		'007' => ['t',"Roational Image Group files live here",'rotatedir'],
+
+		'020' => ['l',"File",'Disk'],
+		'021' => ['t',"Rotational Image Group files live here",'rotatedir'],
+		'025' => ['c',"Purge old RSS items when loading",'purgeRSS'],
 		
 		'030' => ['l',"User Interface",'UI'],
 		'032' => ['n',"Shorten names to this length",'namelimit',20,15,100,1,10],
@@ -216,9 +219,9 @@ A group for storing randomizeable lists containing names and descriptions in row
 =cut
 sub new {
 	my ($class,%profile) = @_;
-	my $order = ${RRGroup->order(-2)}{$profile{order}}; # given value might need conversion.
+	my $order = RRGroup->order($profile{order},1); # given value might need conversion.
 	my $self = {
-		order => ($order or 0),
+		order => $order,
 		rows => ( $profile{rows} || []),
 	};
 	bless $self,$class;
@@ -262,19 +265,35 @@ sub items { # gets the number of items in a row
 	return scalar($self->row($rownum));
 }
 
+=item order()
+
+Gets or sets the group's sequencing order. For example:
+
+ $group->order("striped",1);  # returns 1 (value of striped)
+ $group->order(3,1); 		  # returns 3
+ $group->order(-1);			  # returns the RRGroup's order as a name
+ $group->order();			  # returns the RRGroup's order as a value
+ $group->order("mixed");	  # sets the RRGroup's order to 3 and returns 3
+ $group->order(2);	  		  # sets the RRGroup's order to 2 and returns 2
+
+=cut
+
 sub order { # get or set the order
-	my ($self,$order) = @_;
-	my %values = ( "none" => 0, "striped" => 1, "grouped" => 2, "mixed" => 3,);
-	$order = ($values{$order} or $order);
-	return \%values if ($order == -2);
-	if ($order == -1) {
-		foreach my $k (keys %values) {
-			return $k if $values{$k} == $self{order}; # if given "-1", try to return the name of the order instead of its code value.
-		}
-		return "ERROR"; # prevent the order from being overwritten with -1 in case of invalid value.
+	my ($self,$order,$nostore) = @_;
+	defined $order || return $self->{order}; # called as a getter.
+	my %orders = ( "none" => 0, "striped" => 1, "grouped" => 2, "mixed" => 3,"sequenced" => 4,);
+	unless ($order =~ m/-?\d+/) {
+		$order = ($orders{$order} or $order);
 	}
-	$self{order} = int($order) if (defined $order);
-	return $self{order};
+	unless ($order == -1) { # only do this if not querying for order name
+		return $order if ($nostore); # send back the order (probably translated from name to value) if $nostore is true.
+		$self->{order} = int($order) if (defined $order); # otherwise, store the value in our order field.
+	} else {
+		foreach my $k (keys %orders) {
+			return $k if $orders{$k} == $self->{order}; # if given "-1", try to return the name of the order instead of its code value.
+		}
+	}
+	return $self->{order};
 }
 
 sub rows {
