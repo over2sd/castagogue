@@ -148,6 +148,32 @@ sub readFile {
 }
 print ".";
 
+
+sub openOutfile {
+	my ($fn,$mode) = @_;
+	my $fail = 0;
+	my $outputfilehandle;
+	if ($fn eq '-') { return *STDOUT; }
+	if ($mode) { # overwrite
+		open ($outputfilehandle, ">$fn") || ($fail = 1);
+	} else { # append
+		open ($outputfilehandle, ">>$fn") || ($fail = 1);
+	}
+	if ($fail) { print "\n[E] Dying of file error trying to open $fn for writing: $! Woe, I am slain!"; exit(-1); }
+	return $outputfilehandle;
+}
+
+sub writeLines {
+	my ($fn,$aref,$overwrite) = @_;
+	my $fh = openOutfile($fn,$overwrite);
+	die "FIO::writeLines was not given an ARRAYREF" unless $aref =~ /^ARRAY/;
+	foreach my $l (0 .. $#$aref) {
+		my $line = @{$aref}[$l];
+		print $fh "$line\n";
+	}
+	return 0;
+}
+
 sub Webget {
 	my ($uri,$lfn,$out) = @_;
 	require WWW::Mechanize;

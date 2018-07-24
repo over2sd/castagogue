@@ -23,6 +23,7 @@ my $begin = 'today';
 my $conclude = 'tomorrow';
 my $nextid = 1;
 my $helpme = 0;
+my $confme = 0;
 
 GetOptions(
 	'outputfile|o=s' => \$outfile,
@@ -33,6 +34,7 @@ GetOptions(
 	'conf|c=s' => \$conffilename,
 	'verbose|v=i' => \$debug,
 	'usage|h' => \$helpme,
+	'options|?=s' => \$confme,
 );
 
 if ($helpme) {
@@ -45,6 +47,7 @@ if ($helpme) {
    --conf -c <filename>:       Read this configuration file
    --verbose -v                Be verbose
    --usage -h                  Display this useful message
+   --options -? <section>/all: Displays options for the config file
 	";
 	exit(0);
 }
@@ -57,6 +60,10 @@ require Common;
 require FIO;
 require NoGUI;
 require castRSS; # castagogue RSS functions
+
+if ($confme) {
+	NoGUI::callOptBox($confme);
+}
 
 # Proof of concept for the Random Rotation Groups objects
 # Not for production.
@@ -79,19 +86,6 @@ FIO::config('Main','nextid',$nextid);
 foreach (Sui::getDefaults()) {
 	FIO::config(@$_) unless defined FIO::config($$_[0],$$_[1]);
 }
-
-
-sub openOutfile {
-	my ($fn) = @_;
-	my $fail = 0;
-	my $outputfilehandle;
-	if ($fn eq '-') { return *STDOUT; }
-    open ($outputfilehandle, ">$fn") || ($fail = 1);
-	if ($fail) { print "\n[E] Dying of file error: $! Woe, I am slain!"; exit(-1); }
-	return $outputfilehandle;
-}
-
-
 
 #my $out = openOutfile($outfile);
 my $mainwindow = "placeholder";

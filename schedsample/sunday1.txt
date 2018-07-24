@@ -1,4 +1,5 @@
 title=First Monday Events
+lead=1
 text=Monday, %date%:
 - 10:30 am - Monthly women's meeting
 image=https://www.mydomain.com/img/mon.png

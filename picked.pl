@@ -9,7 +9,7 @@ use utf8;
 ####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
 
 my $PROGRAMNAME = "Castapic";
-my $version = "0.002a";
+my $version = "0.003a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] Castapic v$version is running.";
@@ -44,19 +44,6 @@ FIO::config('Debug','v',howVerbose());
 foreach (Sui::getDefaults()) {
 	FIO::config(@$_) unless defined FIO::config($$_[0],$$_[1]);
 }
-
-
-sub openOutfile {
-	my ($fn) = @_;
-	my $fail = 0;
-	my $outputfilehandle;
-	if ($fn eq '-') { return *STDOUT; }
-    open ($outputfilehandle, ">$fn") || ($fail = 1);
-	if ($fail) { print "\n[E] Dying of file error: $! Woe, I am slain!"; exit(-1); }
-	return $outputfilehandle;
-}
-
-
 
 use Prima qw(Application Buttons MsgBox FrameSet Edit );
 my $gui = PGK::createMainWin($PROGRAMNAME,$version,800,500);

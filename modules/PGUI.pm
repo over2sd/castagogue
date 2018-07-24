@@ -8,6 +8,7 @@ require Exporter;
 use FIO qw( config );
 use PGK;
 use Prima qw( ImageViewer Sliders );
+use Common qw( missing );
 
 =head1 NAME
 
@@ -37,10 +38,11 @@ sub tryLoadInput {
 	my $expanded = 800;
 	my $moment = $pausebox->value;
 	my $hitserver = 0;
+	my $orderkey = 0; # keep URLs in order
 	$viewsize = $viewsize->value; # object to int
 	return 0 unless (Common::findIn($fn,@openfiles) < 0); # don't try to load if already loaded that file.
 	return 0 unless (-e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
-	my $thumb = FIO::config('Net','thumbdir') or "itn";
+	my $thumb = (FIO::config('Net','thumbdir') or "itn");
 	my $stat = getGUI('status');
 	$stat->push("Trying to load $fn...");
 	my @them = FIO::readFile($fn,$stat);
@@ -53,14 +55,18 @@ sub tryLoadInput {
 	my $hb = $outbox->insert( HBox => name => "$fn" ); # Left/right panes
 	my $ib = $hb->insert( VBox => name => "Image Port", pack => {fill => 'y', expand => 1, padx => 3, pady => 3,} ); # Top/bottom pane in left pane
 	my $vp; # = $ib->insert( ImageViewer => name => "i$img", zoom => $iz, pack => {fill => 'none', expand => 1, padx => 1, pady => 1,} ); # Image display box
-	my $cap = $ib->insert( Label => text => "Nothing Showing", pack => {fill => 'x', expand => 0, padx => 1, pady => 1,} ); # caption label
+	my $cap = $ib->insert( Label => text => "(Nothing Showing)\nTo load an image, click its button in the list.", autoHeight => 1, pack => {fill => 'x', expand => 0, padx => 1, pady => 1,} ); # caption label
 	my $lbox = $hb->insert( VBox => name => "Images", pack => {fill => 'both', expand => 1, padx => 0, pady => 0,} ); # box for image rows
 	foreach my $line (@them) {
 		$line =~ /(https?:\/\/)?([\w-]+\.[\w-]+\.\w+\/|[\w-]+\.\w+\/)(.*\/)*(\w+\.?\w{3})/;
 		my $server = $2 or "";
 		my $img = $4 or "";
 		my $row = $lbox->insert( HBox => name => $img);
-		return -1 if ($server eq "" || $img eq "");
+		return -1 if ($server eq "" || $img eq ""); # if we couldn't parse this, we won't try to build a row, or even continue.
+		$orderkey++; # new order key for each image found.
+		my $okey = sprintf("%04d",$orderkey);# Friendly name, in string format for use as hash key for keeping image order
+		$$hashr{$okey} = {}; # make a new empty hash for each image
+		$$hashr{$okey}{url} = $line; # Store image url for matching with a description later
 		$img =~ s/\?.*//; # we won't want ?download=true or whatever in our filenames.
 		my $lfp = $thumb . "/";
 		unless (-e $lfp . $img && -f _ && -r _) {
@@ -74,7 +80,7 @@ sub tryLoadInput {
 		}
 		if (-r $lfp . $img ) {
 # put both of these in a row object, along with the inputline for the description
-			$row->insert( Label => name => "$img", text => "$img", onClick => sub { $row->height($expanded); });
+			$row->insert( Label => name => "$img", text => "Description for ");
 # replace this with an Image object, so we can set the zom factor and resize the image when the user clicks on it to see it so they can describe it.
 			my $pic = Prima::Image->new;
 			my $lfn = "$lfp$img";
@@ -101,10 +107,10 @@ sub tryLoadInput {
 		} else {
 			$row->insert( Label => text => "$img could not be loaded for viewing." );
 		}
-		$row->insert( Label => text => "Description of image:");
-		my $desc = $row->insert( InputLine => width => 100, name => "$line", text => "?" );
-		$desc->set(onLeave => sub { $$hashr{$desc->name} = $desc->text; });
-		$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store
+		$row->insert( Label => text => ":");
+		my $desc = $row->insert( InputLine => width => 100, name => "$line", text => "" );
+		$desc->set(onLeave => sub { $$hashr{$okey}{desc} = $desc->text; });
+		$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store, not by what the button does but by causing the input to lose focus.
 #		$row->height($collapsed);
 		if ($hitserver) {
 			$stat->push("Waiting...");
@@ -113,22 +119,36 @@ sub tryLoadInput {
 		}
 	}
 	my $of = $outbox->insert( InputLine => text => "prayers.dsc", pack => { fill => 'x', expand => 1, },);
-	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 1, }, onClick => sub { my $ofn = $of->text; $outbox->destroy(); saveDescs($ofn,$hashr); });
+	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 1, }, onClick => sub { my $ofn = $of->text; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn.");});
 	$stat->push("Done.");
+	return 0; # success!
 }
 print ".";
 
-=item saveDescs FILE HASH
+=item saveDescs FILE HASH [OVERWRITE]
 
-Given a FILEname and a HASHref to a list of descriptions, converts the list into a format suitable for the group files the Ordering page will read.
+Given a FILEname and a HASHref to a list of descriptions, converts the list into a format suitable for the group files the Ordering page will read. Optionally you can add a marker to blank the file before writing to it (OVERWRITE).
 
 =cut
 
 sub saveDescs {
-	my ($fn,$hr) = @_;
+	my ($fn,$hr,$overwrite) = @_;
 	use Data::Dumper;
 	print "If this were finished, I'd save the following data to lib/$fn...";
 	print Dumper $hr;
+	my $n = length keys $hr;
+	my @lines = ();
+	my $verbose = FIO::config('Debug','v');
+	$verbose and print "\n[I] Saving $n descriptions to $fn... ";
+	foreach my $ok (sort keys %$hr) {
+		next if (missing($$hr{$ok}{url}) || missing($$hr{$ok}{desc}));
+		print "$ok, ";
+		push(@lines,"item=$ok");
+		push(@lines,"url=$$hr{$ok}{url}");
+		push(@lines,"desc=$$hr{$ok}{desc}");
+	}
+	my $lib = (FIO::config("Disk",'rotatedir') or "lib");
+	FIO::writeLines("$lib/$fn",\@lines,$overwrite);
 	return 0;
 }
 print ".";
@@ -161,41 +181,12 @@ sub resetDescribing {
 	closedir(DIR);
 	foreach my $f (@files) {
 		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-			tryLoadInput($imgpage,$f,$delaybox,\%images,$sizer);
+			my $error = tryLoadInput($imgpage,$f,$delaybox,\%images,$sizer);
+			$error and sayBox(getGUI("mainWin"),"An error occurred trying to load $f.\nPlease check the file to ensure it contains valid URLS, one on each line.");
 		});
 	}
 	$delaybox->text("7");
 	return 0;
-}
-print ".";
-
-=item resetDescribing TARGET
-
-Given a TARGET widget, generates the list widgets needed to perform the Ordering page's functions.
-Returns 0 on completion.
-Dies on error opening library directory.
-
-=cut
-
-sub resetOrdering {
-	my ($args) = @_;
-	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
-	$ordpage->empty(); # start with a blank slate
-	my $odir = (FIO::config('Main','rotatedir') or "lib");
-	opendir(DIR,$odir) or die $!;
-	my @files = grep {
-		/\.rig$/ # only show rotational image group files.
-		&& -f "$odir/$_"
-		} readdir(DIR);
-	closedir(DIR);
-	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1} );
-	$lister->insert( Label => text => "Choose a file containing URLs:");
-	foreach my $f (@files) {
-		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-#			tryLoadGroup($ordpage,$f);
-		});
-	}
-	my $op = labelBox($ordpage,"Ordering page not yet coded.",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
 }
 print ".";
 
@@ -232,11 +223,7 @@ sub populateMainWin {
 		pack => { fill => 'both', },
 	);
 	my $gp = labelBox($grppage,"Grouping page not yet coded.",'g','H', boxfill => 'both', boxex => 1, labfill => 'x', labex => 1);
-# dispatcher proof of concept
-	my $tl = $gp->insert( Label => text => "1" );
-	sub increment_478924 { my $count = int($tl->text) + 1; $tl->text("$count"); }
-	$pager->setSwitchAction("Grouping",\&increment_478924);
-# end POC
+	$pager->setSwitchAction("Grouping",\&resetGrouping,$grppage);
 
 	# Ordering tab
 	$color = Common::getColors(($i++ % 2 ? 0 : 10),1);

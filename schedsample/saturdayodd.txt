@@ -1,4 +1,5 @@
 title=Odd Sunday Events
+lead=1
 text=%name% Events for Sunday, %date%:
 - 1:30 pm - Childrens's Prayer Hour
   - indented line

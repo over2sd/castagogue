@@ -119,6 +119,8 @@ sub processFile {
 			my $rdate = substr(timeAsRSS($d),0,-15);
 			my $ti = RItem->new(date => "$rdate");
 			my $descact = 0;
+			my $ed = $d + DateTime::Duration->new( days=> (FIO::config('Main','eventlead') or 0)); # so we can add to it without losing our place.
+
 			while (my $line = <$fh>) { # read lines
 				chomp $line;
 				$line =~ m/(.*?\=)?(.*)/; # find keywords
@@ -126,11 +128,14 @@ sub processFile {
 				$k =~ s/\s//g; # no whitespace in keywords, please
 				if ($k eq "text") { # for each keyword, store data in hash
 					$descact = 1;
-					my $parsed = Sui::expandMe($2,$d); # this is date/description text
+					my $parsed = Sui::expandMe($2,$ed); # this is date/description text
 					$ti->text($parsed);
 				} elsif ($descact && $k eq "---") { # this is another line of text
-					my $parsed = Sui::expandMe($2,$d);
+					my $parsed = Sui::expandMe($2,$ed);
 					$ti->text($ti->text() . "\n$parsed");
+				} elsif ($k eq "lead") { # how far ahead the post is dated from the publication date MUST be in the file before the text with date replacements, or the date will be wrong.
+					my $lead = int($2);
+					$ed = $d + DateTime::Duration->new( days=> $lead); # events are posted how far ahead?
 				} elsif ($k eq "image") { # the link/image that goes with the post
 					$ti->link($2);
 					$descact = 0;
@@ -151,6 +156,7 @@ sub processFile {
 					push(@items,$ti); # store record
 					last if(!defined $2 || $2 eq "1"); # if last item, exit loop
 					print $fn;
+					$ed = $d + DateTime::Duration->new( days=> (FIO::config('Main','eventlead') or 0)); # so we can add to it without losing our place.
 					$ti = RItem->new(date => "$rdate"); # start new record, in case there are more items in this file
 				} else { # Oops! Error.
 					warn "\n[W] I found unexpected keyword $k with value $2.\n";

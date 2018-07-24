@@ -2,7 +2,7 @@ package Common;
 print __PACKAGE__;
 
 use Exporter qw(import);
-our @EXPORT = qw( infMes getColorsbyName );
+our @EXPORT = qw( infMes getColorsbyName missing );
 
 my @obj = @{ Sui::passData('objectionablecontent') };
 my %objindex;
@@ -160,6 +160,14 @@ sub getColors{
 	} else {
 		return @colors;
 	}
+}
+print ".";
+
+sub missing { # useful if multiple values must be checked in one conditional
+	my ($sCat,$blankok) = @_;
+	return 1 unless(defined $sCat); # not defined: TRUE
+	return 1 unless($sCat ne "" || $blankok); # blank: TRUE unless blank is ok.
+	return 0; # defined an not blank: FALSE
 }
 print ".";
 
@@ -573,7 +581,7 @@ print ".";
 sub RSSclean {
 my $in = shift;
 	$in =~ s/\015\012?/\012/g; # CR or CRLF to LF
-#	$in =~ s/&(?!(?:[a-zA-Z0-9]+|#\d+);)/&amp;/g; # Lonely Ampersand
+	$in =~ s/&(?!(?:[a-zA-Z0-9]+|#\d+);)/&#x26;/g; # Lonely Ampersand
 	return $in;
 }
 print ".";

@@ -106,7 +106,8 @@ sub getOpts {
 ##		'003' => ['x',"Background color ",'bgcol',"#CCCCCC"],
 		'004' => ['c',"Errors are fatal",'fatalerr'],
 		'005' => ['t',"Name of organization",'orgname'],
-		'006' => ['n',"Time Zone Offset (from GMT)",'tz'],
+		'006' => ['n',"Time Zone Offset (from GMT)",'tz',-12,12,1,6],
+		'007' => ['n',"By default, how many days ahead to post",'eventlead'],
 
 		'020' => ['l',"File",'Disk'],
 		'021' => ['t',"Rotational Image Group files live here",'rotatedir'],
@@ -126,6 +127,7 @@ sub getOpts {
 		'100' => ['l',"Network",'Net'],
 		'101' => ['c',"Save bandwidth by saving iamge thumbnails",'savethumbs'],
 		'102' => ['t',"Thumbnail Directory",'thumbdir'],
+		'103' => ['n',"File argument Style",'wierdRL'], # 0 = xxx.png, 1 = xxx.png?dl=1, 2 = view?asset=xxxx, 3 = view.png?asset=xxxx
 
 		'750' => ['l',"Fonts",'Font'],
 		'754' => ['f',"Tab font/size: ",'label'],

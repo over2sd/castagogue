@@ -1,0 +1,18 @@
+title=Tomorrow's Event
+lead=1
+text=%weekday, %date%:
+%name% is proud to annouce these events...
+1. ...
+2. ...
+image=http://www.imagehost.com/long/gnarly/directories/yourfile.png?dl=1
+time=1100
+category=events
+last=0
+
+OR:
+
+group=prayers
+order=sequenced
+time=1900
+category=prayer
+last=1
