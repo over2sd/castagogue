@@ -1,0 +1,236 @@
+FIO::config() - modules\FIO.pm:21
+FIO::cfgrm() - modules\FIO.pm:42
+FIO::validateConfig() - modules\FIO.pm:54
+FIO::saveConf() - modules\FIO.pm:71
+FIO::loadConf() - modules\FIO.pm:83
+FIO::gz_decom() - modules\FIO.pm:96
+FIO::getFileName() - modules\FIO.pm:112
+FIO::readFile() - modules\FIO.pm:135
+FIO::openOutfile() - modules\FIO.pm:152
+FIO::writeLines() - modules\FIO.pm:166
+FIO::Webget() - modules\FIO.pm:177
+	Processing modules\Common.pm
+Common.......................................
+Writing 39 functions to STDOUT...
+Common::contentMask() - modules\Common.pm:11
+Common::contentList() - modules\Common.pm:22
+Common::getBit() - modules\Common.pm:25
+Common::setBit() - modules\Common.pm:32
+Common::unsetBit() - modules\Common.pm:38
+Common::toggleBit() - modules\Common.pm:45
+Common::expandMask() - modules\Common.pm:53
+Common::fmod() - modules\Common.pm:64
+Common::get() - modules\Common.pm:72
+Common::loadSeedsFrom() - modules\Common.pm:87
+Common::selectWidth() - modules\Common.pm:118
+Common::getColorsbyName() - modules\Common.pm:137
+Common::getColors{() - modules\Common.pm:148
+Common::missing() - modules\Common.pm:166
+Common::findIn() - modules\Common.pm:174
+Common::between() - modules\Common.pm:196
+Common::nround() - modules\Common.pm:208
+Common::disambig() - modules\Common.pm:221
+Common::revGet() - modules\Common.pm:227
+Common::indexOrder() - modules\Common.pm:241
+Common::shorten() - modules\Common.pm:270
+Common::getAge() - modules\Common.pm:289
+Common::stripDOBdashes() - modules\Common.pm:307
+Common::DoBrangefromAges() - modules\Common.pm:321
+Common::registerErrors() - modules\Common.pm:340
+Common::registerZero() - modules\Common.pm:358
+Common::errorOut() - modules\Common.pm:367
+Common::errSpecial() - modules\Common.pm:419
+Common::infMes() - modules\Common.pm:427
+Common::errColor() - modules\Common.pm:433
+Common::findClosest() - modules\Common.pm:443
+Common::vary() - modules\Common.pm:481
+Common::listSort() - modules\Common.pm:488
+Common::listMerge() - modules\Common.pm:506
+Common::lineNo() - modules\Common.pm:529
+Common::defineAllValues() - modules\Common.pm:548
+Common::median() - modules\Common.pm:557
+Common::today() - modules\Common.pm:570
+Common::RSSclean() - modules\Common.pm:581
+	Processing modules\castRSS.pm
+castRSS.......
+Writing 7 functions to STDOUT...
+castRSS::prepare() - modules\castRSS.pm:14
+castRSS::getGUID() - modules\castRSS.pm:59
+castRSS::makeItem() - modules\castRSS.pm:70
+castRSS::timeAsRSS() - modules\castRSS.pm:88
+castRSS::processFile() - modules\castRSS.pm:99
+castRSS::processDay() - modules\castRSS.pm:177
+castRSS::processRange() - modules\castRSS.pm:211
+	Processing modules\NoGUI.pm
+NoGUI
+StatusBar...
+NoGUI...
+Writing 6 functions to STDOUT...
+StatusBar::new() - modules\NoGUI.pm:7
+StatusBar::prepare() - modules\NoGUI.pm:14
+StatusBar::push() - modules\NoGUI.pm:26
+NoGUI::callOptBox() - modules\NoGUI.pm:35
+NoGUI::mkOptBox() - modules\NoGUI.pm:42
+NoGUI::explainOpts() - modules\NoGUI.pm:67
+	Processing modules\PGK.pm
+PGK
+XButtons.....
+ColorRow......
+FontRow....
+HBox...
+VBox...
+VBoxE..
+StatBox....
+StatusBar..
+Table..............................
+Pager........
+PGK.......................
+Writing 90 functions to STDOUT...
+XButtons::build() - modules\PGK.pm:52
+XButtons::xClick() - modules\PGK.pm:72
+XButtons::value() - modules\PGK.pm:94
+XButtons::insert() - modules\PGK.pm:107
+XButtons::arrange() - modules\PGK.pm:121
+ColorRow::build() - modules\PGK.pm:157
+ColorRow::getKid() - modules\PGK.pm:201
+ColorRow::getSwatch() - modules\PGK.pm:215
+ColorRow::getEntry() - modules\PGK.pm:226
+ColorRow::matchColor() - modules\PGK.pm:237
+ColorRow::stringToColor() - modules\PGK.pm:249
+FontRow::build() - modules\PGK.pm:281
+FontRow::clicked() - modules\PGK.pm:315
+FontRow::getFontString() - modules\PGK.pm:327
+FontRow::stringToFont() - modules\PGK.pm:332
+HBox::insert() - modules\PGK.pm:366
+HBox::arrange() - modules\PGK.pm:373
+HBox::empty() - modules\PGK.pm:385
+VBox::insert() - modules\PGK.pm:412
+VBox::arrange() - modules\PGK.pm:419
+VBox::empty() - modules\PGK.pm:431
+VBoxE::insert() - modules\PGK.pm:444
+VBoxE::empty() - modules\PGK.pm:457
+StatBox::insert() - modules\PGK.pm:469
+StatBox::arrange() - modules\PGK.pm:476
+StatBox::push() - modules\PGK.pm:483
+StatBox::empty() - modules\PGK.pm:493
+StatusBar::prepare() - modules\PGK.pm:520
+StatusBar::push() - modules\PGK.pm:532
+Table::profile_default() - modules\PGK.pm:566
+Table::init() - modules\PGK.pm:591
+Table::insert() - modules\PGK.pm:608
+Table::place_in_table() - modules\PGK.pm:614
+Table::get_row_top() - modules\PGK.pm:660
+Table::sizeCheck() - modules\PGK.pm:670
+Table::row_length_check() - modules\PGK.pm:691
+Table::expand_width() - modules\PGK.pm:697
+Table::reset_column_widths() - modules\PGK.pm:717
+Table::reset_column_width() - modules\PGK.pm:738
+Table::reset_row_heights() - modules\PGK.pm:747
+Table::reset_row_height() - modules\PGK.pm:755
+Table::get_tallest_cell_height() - modules\PGK.pm:761
+Table::get_widest_column_width() - modules\PGK.pm:776
+Table::cellSize() - modules\PGK.pm:791
+Table::position_cell_child() - modules\PGK.pm:810
+Table::adjust_column() - modules\PGK.pm:816
+Table::adjust_row() - modules\PGK.pm:826
+Table::rows() - modules\PGK.pm:839
+Table::adjust_columns_all() - modules\PGK.pm:849
+Table::adjust_rows_all() - modules\PGK.pm:860
+Table::get_column_left() - modules\PGK.pm:869
+Table::request_larger_space() - modules\PGK.pm:899
+Table::requires() - modules\PGK.pm:917
+Table::describe_row() - modules\PGK.pm:925
+Table::describe() - modules\PGK.pm:946
+Table::expand() - modules\PGK.pm:955
+Table::use_uniform_heights() - modules\PGK.pm:961
+Table::use_uniform_widths() - modules\PGK.pm:965
+Table::remainder_column() - modules\PGK.pm:969
+Pager::profile_default() - modules\PGK.pm:993
+Pager::init() - modules\PGK.pm:1006
+Pager::build() - modules\PGK.pm:1028
+Pager::switchToPanel() - modules\PGK.pm:1046
+Pager::insert() - modules\PGK.pm:1059
+Pager::insert_to_page() - modules\PGK.pm:1065
+Pager::panel() - modules\PGK.pm:1079
+Pager::setSwitchAction() - modules\PGK.pm:1091
+PGK::Pdie() - modules\PGK.pm:1115
+PGK::Pwait() - modules\PGK.pm:1124
+PGK::applyFont() - modules\PGK.pm:1148
+PGK::askbox() - modules\PGK.pm:1166
+PGK::convertColor() - modules\PGK.pm:1223
+PGK::createMainWin() - modules\PGK.pm:1243
+PGK::getGUI() - modules\PGK.pm:1276
+PGK::getStatus() - modules\PGK.pm:1299
+PGK::getTabByCode() - modules\PGK.pm:1315
+PGK::labelBox() - modules\PGK.pm:1343
+PGK::refreshUI() - modules\PGK.pm:1364
+PGK::savePos() - modules\PGK.pm:1383
+PGK::checkOffset() - modules\PGK.pm:1400
+PGK::sayBox() - modules\PGK.pm:1427
+PGK::startwithDB() - modules\PGK.pm:1442
+PGK::loadDB() - modules\PGK.pm:1527
+PGK::insertDateWidget() - modules\PGK.pm:1560
+PGK::quickBox() - modules\PGK.pm:1579
+PGK::slidebox() - modules\PGK.pm:1620
+PGK::makeRule() - modules\PGK.pm:1663
+PGK::getScroll() - modules\PGK.pm:1673
+PGK::resetScroll() - modules\PGK.pm:1689
+PGK::scrollit() - modules\PGK.pm:1696
+	Processing modules\PGUI.pm
+PGUI
+PGUI............
+Writing 12 functions to STDOUT...
+PGUI::resetOrdering() - modules\PGUI.pm:37
+PGUI::tryLoadDesc() - modules\PGUI.pm:65
+PGUI::resetGrouping() - modules\PGUI.pm:164
+PGUI::tryLoadInput() - modules\PGUI.pm:198
+PGUI::saveDescs() - modules\PGUI.pm:297
+PGUI::resetDescribing() - modules\PGUI.pm:327
+PGUI::populateMainWin() - modules\PGUI.pm:364
+PGUI::buildMenus() - modules\PGUI.pm:428
+PGUI::aboutBox() - modules\PGUI.pm:449
+PGUI::sayBox() - modules\PGUI.pm:461
+PGUI::callOptBox() - modules\PGUI.pm:475
+PGUI::devHelp() - modules\PGUI.pm:489
+	Processing modules\RItem.pm
+RItem............
+Writing 12 functions to STDOUT...
+RItem::new() - modules\RItem.pm:12
+RItem::get() - modules\RItem.pm:28
+RItem::set() - modules\RItem.pm:34
+RItem::text() - modules\RItem.pm:41
+RItem::name() - modules\RItem.pm:47
+RItem::title() - modules\RItem.pm:53
+RItem::link() - modules\RItem.pm:59
+RItem::cat() - modules\RItem.pm:65
+RItem::category() - modules\RItem.pm:71
+RItem::time() - modules\RItem.pm:77
+RItem::date() - modules\RItem.pm:84
+RItem::timestamp() - modules\RItem.pm:90
+	Processing modules\Sui.pm
+Sui................
+RRGroup.......
+Writing 23 functions to STDOUT...
+Sui::passData() - modules\Sui.pm:27
+Sui::storeData() - modules\Sui.pm:41
+Sui::expandMe() - modules\Sui.pm:53
+Sui::expandGroup{() - modules\Sui.pm:70
+Sui::getTZ() - modules\Sui.pm:77
+Sui::getStatHash() - modules\Sui.pm:86
+Sui::getStatOrder() - modules\Sui.pm:87
+Sui::getStatIndex() - modules\Sui.pm:88
+Sui::getStatArray() - modules\Sui.pm:89
+Sui::getOpts() - modules\Sui.pm:99
+Sui::getTableWidths() - modules\Sui.pm:159
+Sui::getDefaults() - modules\Sui.pm:167
+Sui::registerOutputs() - modules\Sui.pm:185
+Sui::getOutputs() - modules\Sui.pm:194
+Sui::poll() - modules\Sui.pm:200
+Sui::aboutMeText() - modules\Sui.pm:207
+RRGroup::new() - modules\Sui.pm:225
+RRGroup::add() - modules\Sui.pm:236
+RRGroup::item() - modules\Sui.pm:260
+RRGroup::items() - modules\Sui.pm:268
+RRGroup::order() - modules\Sui.pm:286
+RRGroup::rows() - modules\Sui.pm:304
+RRGroup::row() - modules\Sui.pm:310

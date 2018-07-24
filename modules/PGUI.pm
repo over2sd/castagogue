@@ -9,6 +9,7 @@ use FIO qw( config );
 use PGK;
 use Prima qw( ImageViewer Sliders );
 use Common qw( missing );
+use RItem;
 
 =head1 NAME
 
@@ -25,6 +26,193 @@ A library of functions used to build and manipulate the program's Prima user int
 package PGUI;
 
 my @openfiles = [];
+
+=item resetOrdering TARGET
+
+Given a TARGET widget, generates the list widgets needed to perform the Ordering page's functions.
+Returns 0 on completion.
+Dies on error opening library directory.
+
+=cut
+
+sub resetOrdering {
+	my ($args) = @_;
+	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	$ordpage->empty(); # start with a blank slate
+	my $odir = (FIO::config('Disk','rotatedir') or "lib");
+	opendir(DIR,$odir) or die $!;
+	my @files = grep {
+		/\.rig$/ # only show rotational image group files.
+		&& -f "$odir/$_"
+		} readdir(DIR);
+	closedir(DIR);
+	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1} );
+	$lister->insert( Label => text => "Choose a file containing URLs:");
+	foreach my $f (@files) {
+		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
+#			tryLoadGroup($ordpage,$f);
+		});
+	}
+	my $op = labelBox($ordpage,"Ordering page not yet coded.",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+}
+print ".";
+
+=item tryLoadDesc TARGET FILE HASH
+
+Given a reset TARGET widget, a FILE name, and a HASH in which to store data, loads the items from the file and displays them for inclusion input
+
+=cut
+
+sub tryLoadGrouper {
+	devHelp(getGUI('mainWin'),"Loading group files");
+}
+
+=item tryLoadDesc TARGET FILE HASH
+
+Given a reset TARGET widget, a FILE name, and a HASH in which to store data, loads the items from the file and displays them for inclusion input
+
+=cut
+
+sub tryLoadDesc {
+
+my $debug = 1;
+
+	my ($resettarget,$fn,$target,$ar) = @_;
+	my $orderkey = 0; # keep URLs in order
+# TODO store these description pairs in RItem objects
+	my $odir = (FIO::config('Disk','rotatedir') or "lib");
+	$fn = "$odir/$fn";
+	return 1 unless (-e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
+	my $stat = getGUI('status');
+	$stat->push("Trying to read $fn...");
+	my @them = FIO::readFile($fn,$stat);
+	if ($#them == 0) {
+		$stat->push("Zero lines found in file!");
+	} elsif ($#them == 1) {
+		$stat->push("One line found in file!");
+	}
+	my $count = 0;
+print "Processing " . scalar @them . " lines...";
+	my $ti = RItem->new();
+	foreach my $line (@them) {
+		chomp $line;
+		$line =~ m/(.*?\=)?(.*)/; # find keywords
+		my $k = (defined $1 ? substr($1,0,-1) : "---"); # remove the equals sign from the keyword, or mark the line as a continued text line
+		$k =~ s/\s//g; # no whitespace in keywords, please
+		return -1 if ($k eq "" || $2 eq ""); # if we couldn't parse this, we won't try to build a row, or even continue.
+		my $descact = 0;
+		if ($k eq "desc") { # for each keyword, store data in hash
+			$descact = 1;
+			print "!$2!";
+			$ti->text($2);
+			print "> " . $ti->text();
+		} elsif ($descact && $k eq "---") { # this is another line of text
+			$ti->text($ti->text() . "\n$2");
+		} elsif ($k eq "url") { # the link/image that goes with the post
+			$ti->link($2);
+			$descact = 0;
+		} elsif ($k eq "item") { # should start the item record.
+			defined $debug and print ":";
+			$count++;
+			$descact = 0;
+			push(@$ar,$ti); # store record
+			$ti = RItem->new( title => $2 ); # start new record, in case there are more items in this file
+		} else { # Oops! Error.
+			warn "\n[W] I found unexpected keyword $k with value $2.\n";
+		}
+#defined $debug and print "\n $k = $2...";
+	}
+	$stat->push("Found $count items...");
+	use Data::Dumper;
+	print Dumper $ar;
+
+devHelp(getGUI('mainWin'),"Loading description files");
+return 404;
+
+
+
+
+
+
+		if (-r $lfp . $img ) {
+# put both of these in a row object, along with the inputline for the description
+			$row->insert( Label => name => "$img", text => "Description for ");
+# replace this with an Image object, so we can set the zom factor and resize the image when the user clicks on it to see it so they can describe it.
+			my $pic = Prima::Image->new;
+			my $lfn = "$lfp$img";
+			$pic->load($lfn);
+#			$pic->set(scaling => 7); # ist::Hermite);
+			my $shower = $row->insert( Button => name => "$lfn", text => "$img",); # button for filename
+			$shower->set( onClick => sub {
+				defined $vp and $vp->destroy;
+				$cap->text($shower->text);
+				$vp = $ib->insert( ImageViewer =>
+					name => "i$img", zoom => $iz, width => $viewsize, height => $viewsize,
+					pack => {fill => 'none'}, image => $pic); $::application->yield(); });
+# put description inputline here.
+		} else {
+			$row->insert( Label => text => "$img could not be loaded for viewing." );
+		}
+		$row->insert( Label => text => ":");
+		my $desc = $row->insert( InputLine => width => 100, name => "$line", text => "" );
+		$desc->set(onLeave => sub { $$hashr{$okey}{desc} = $desc->text; });
+		$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store, not by what the button does but by causing the input to lose focus.
+#		$row->height($collapsed);
+		if ($hitserver) {
+			$stat->push("Waiting...");
+			Pwait($moment);
+			$hitserver = 0;
+		}
+	my $of = $outbox->insert( InputLine => text => "prayers.dsc", pack => { fill => 'x', expand => 1, },);
+	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 1, }, onClick => sub { my $ofn = $of->text; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn.");});
+	$stat->push("Done.");
+	return 0; # success!
+}
+print ".";
+
+=item resetGrouping TARGET
+
+Given a TARGET widget, generates the list widgets needed to perform the Grouping page's functions.
+Returns 0 on completion.
+Dies on error opening library directory.
+
+=cut
+
+sub resetGrouping {
+	my ($args) = @_;
+	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	$ordpage->empty(); # start with a blank slate
+	my $odir = (FIO::config('Disk','rotatedir') or "lib");
+	opendir(DIR,$odir) or die $!;
+	my @files = grep {
+#		/\.dsc$/ && # only show description files.
+			-f "$odir/$_"
+		} readdir(DIR);
+	closedir(DIR);
+	my $tar = []; # Target Array Reference
+	my $rows = [];
+	my $paner = $ordpage->insert( HBox => name => "panes", pack => {fill => 'both', expand => 1} );
+	my $lpane = $paner->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1} );
+	my $lister = $lpane->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1} );
+	my $rpane = $paner->insert( VBox => name => "Output", pack => {fill => 'both', expand => 1} );
+	my $grouper = $rpane->insert( VBox => name => "grouper", pack => {fill => 'both', expand => 1} );
+	my $rowbox;
+	$lister->insert( Label => text => "Choose a file containing URLs:");
+	my $stat = getGUI("status");
+	foreach my $f (@files) {
+		if ($f =~ /\.dsc/) { # description files
+			$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
+				my $error = tryLoadDesc($lpane,$f,$rowbox,$tar);
+				$error && $stat->push("An error occurred loading $f!"); });
+		} elsif ($f =~ /\.rig/) { # rotating image groups
+			$grouper->insert( Button => text => $f, onClick => sub { $grouper->destroy();
+				my $error = tryLoadGrouper($rpane,$f,$tar,$rows);
+				$error && $stat->push("An error occurred loading $f!"); });
+		}
+	}
+	my $op = labelBox($ordpage,"Ordering page not yet coded.",'r','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+}
+print ".";
 
 =item tryLoadInput TARGET FILE PAUSEOBJ HASH SIZEOBJ
 
@@ -136,7 +324,7 @@ sub saveDescs {
 	use Data::Dumper;
 	print "If this were finished, I'd save the following data to lib/$fn...";
 	print Dumper $hr;
-	my $n = length keys $hr;
+	my $n = length keys %$hr;
 	my @lines = ();
 	my $verbose = FIO::config('Debug','v');
 	$verbose and print "\n[I] Saving $n descriptions to $fn... ";
