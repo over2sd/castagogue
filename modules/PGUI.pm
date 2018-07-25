@@ -124,7 +124,7 @@ return 404;
 			$link = $2;
 			$descact = 0;
 		} elsif ($k eq "row") { # should start the row record.
-			if (defined $link && defined $desc && defined $itemname) itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc);
+			itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
 			($link,$desc,$itemname) = (undef,undef,undef); # clear values so I can check for definition
 			my $row = $target->insert( VBox => backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
 			$row->insert( InputLine => text => $2 );
@@ -137,7 +137,7 @@ return 404;
 				$stat->push("Malformed file $fn gives an item outside of a row! Aborting.");
 				return -3;
 			}
-			if (defined $link && defined $desc && defined $itemname) itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc);
+			itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
 			($link,$desc,$itemname) = (undef,undef,undef); # clear values so I can check for definition
 			defined $debug and print ":";
 			$count++;
