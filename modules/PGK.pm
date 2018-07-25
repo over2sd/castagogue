@@ -1346,12 +1346,12 @@ sub labelBox {
 	my $box;
 	unless (defined $orientation && $orientation =~ /[Hh]/) {
 		$box = $parent->insert( VBox => name => "$name", alignment => ta::Left, );
-		$box->pack( fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1), padx => ($args{margin} or 1), pady => ($args{margin} or 1), );
+		$box->pack( fill => ($args{boxfill} or 'none'), expand => (defined $args{boxex} ? $args{boxex} : 1), padx => (defined $args{margin} ? $args{margin} : 1), pady => (defined $args{margin} ? $args{margin} : 1), );
 	} else {
 		$box = $parent->insert( HBox => name => "$name", alignment => ta::Left, );
-		$box->pack( fill => ($args{boxfill} or 'none'), expand => ($args{boxex} or 1), padx => ($args{margin} or 1), pady => ($args{margin} or 1), );
+		$box->pack( fill => ($args{boxfill} or 'none'), expand => (defined $args{boxex} ? $args{boxex} : 1), padx => (defined $args{margin} ? $args{margin} : 1), pady => (defined $args{margin} ? $args{margin} : 1), );
 	}
-	$box->insert( Label => text => "$label", valignment => ta::Middle, alignment => ta::Left, pack => { fill => ($args{labfill} or 'x'), expand => ($args{labex} or 0), }  );
+	$box->insert( Label => text => "$label", valignment => ta::Middle, alignment => ta::Left, pack => { fill => (defined $args{labfill} ? $args{labfill} : 'x'), expand => (defined $args{labex} ? $args{labex} : 0), }  );
 	return $box;
 }
 print ".";

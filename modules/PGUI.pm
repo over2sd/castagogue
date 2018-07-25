@@ -57,14 +57,122 @@ sub resetOrdering {
 }
 print ".";
 
-=item tryLoadDesc TARGET FILE HASH
+sub itemIntoRow {
+	my ($rows,$index,$iname,$link,$desc) = @_;
+}
+print ".";
 
-Given a reset TARGET widget, a FILE name, and a HASH in which to store data, loads the items from the file and displays them for inclusion input
+=item tryLoadGrouper TARGET FILE LISTPANE HASHREF HASHREF
+
+Given a reset TARGET widget, a FILE name, a HASHREF of storable values, and a HASHREF in which to store data, loads the rows from a file and displays them for output addition
 
 =cut
-
+#$rpane,$f,$preview,$tar,$rows);
 sub tryLoadGrouper {
+
+use Data::Dumper;
+	my ($target,$fn,$prev,$items,$rows) = @_;
+	my $orderkey = 0; # keep URLs in order
+	my $odir = (FIO::config('Disk','rotatedir') or "lib");
+	$fn = "$odir/$fn";
+	if (-e $fn) { # existing file
+		return 1 unless (-f $fn && -r _); # stop process if not a valid filename for a readable file.
+	} else { # new file?
+		(-r $fn) and print "File $fn created!\n";
+	}
+	my $stat = getGUI('status');
+	$stat->push("Trying to read $fn...");
+	my @them = FIO::readFile($fn,$stat);
+	if ($#them == 0) {
+		$stat->push("Zero lines found in file!");
+	} elsif ($#them == 1) {
+		$stat->push("One line found in file!");
+	}
+	$stat->push("Processing " . scalar @them . " lines...");
+	my ($rowname,$nextpair,$desc,$link,$itemname,$rbox);
+	my $rows = 0;
+	my $foundrow = 0;
+# rowbox (( rownameinput rowkillbutton items [[ VBoxes moved over from preview? ]] ))
+
 	devHelp(getGUI('mainWin'),"Loading group files");
+return 404;
+	foreach my $line (@them) {
+		chomp $line;
+		$line =~ m/(.*?\=)?(.*)/; # find keywords
+		my $k = (defined $1 ? substr($1,0,-1) : "---"); # remove the equals sign from the keyword, or mark the line as a continued text line
+		$k =~ s/\s//g; # no whitespace in keywords, please
+		return -1 if ($k eq "" || $2 eq ""); # if we couldn't parse this, we won't try to build a row, or even continue.
+		my $descact = 0;
+		if ($k eq "desc") { # for each keyword, store data in hash
+			unless ($foundrow) {
+				$stat->push("Malformed file $fn gives an item description outside of a row! Aborting.");
+				return -1;
+			}
+			$descact = 1;
+			$desc = $2;
+		} elsif ($descact && $k eq "---") { # this is another line of text
+			unless ($foundrow) {
+				$stat->push("Malformed file $fn gives an item description outside of a row! Aborting.");
+				return -1;
+			}
+			$desc = $desc . "\n$2";
+		} elsif ($k eq "image") { # the link/image that goes with the post
+			unless ($foundrow) {
+				$stat->push("Malformed file $fn gives a link outside of a row! Aborting.");
+				return -2;
+			}
+			$link = $2;
+			$descact = 0;
+		} elsif ($k eq "row") { # should start the row record.
+			if (defined $link && defined $desc && defined $itemname) itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc);
+			($link,$desc,$itemname) = (undef,undef,undef); # clear values so I can check for definition
+			my $row = $target->insert( VBox => backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
+			$row->insert( InputLine => text => $2 );
+			my $kill = $foundrow; # maintain scope for kill button
+			$row->insert( Button => text => "X", onClick => sub { splice(@$rows,$kill,1); $row->destroy(); } ); #delete row from page and from array
+			$foundrow++;
+			push(@$rows,$row);
+		} elsif ($k eq "item") { # should start the item record.
+			unless ($foundrow) {
+				$stat->push("Malformed file $fn gives an item outside of a row! Aborting.");
+				return -3;
+			}
+			if (defined $link && defined $desc && defined $itemname) itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc);
+			($link,$desc,$itemname) = (undef,undef,undef); # clear values so I can check for definition
+			defined $debug and print ":";
+			$count++;
+			$descact = 0;
+		} else { # Oops! Error.
+			warn "\n[W] I found unexpected keyword $k with value $2.\n";
+		}
+#defined $debug and print "\n $k = $2...";
+	}
+	$resettarget->insert( Button => # place button for adding...
+		text => "Add " . $ti->text(),
+		onClick => sub {
+			my $pr = labelBox($target,$ti->text(),$ti->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+			$pr->insert( Button => # which places button for removing...
+				text => "Remove",
+				onClick => sub { $pr->destroy(); return 0; },
+			);
+		}
+	) unless ($ti->title() eq "Unnamed");
+	$stat->push("Done loading $count items.");
+	return 0; # success!
+
+	my @rows = $prev->get_widgets(); # prev is expected to be a VBox. Grab its children.
+	foreach my $r (@rows) {
+		print "The name is " . $r->name() . "..."; # the row's name will match the item's name...
+		my $item;
+		foreach my $it (@$items) {
+			if ($it->name() eq $r->name()) {
+				$item = $it;
+				last;
+			}
+		}
+		my @box = $r->get_widgets(); # each row should be an HBox containing a Label and a Button.
+		defined $item and print "Seeking " . $box[0]->text() . " => " . $item->link() . "...\n"; # the row's label's text should match the item's text.
+	}
 }
 
 =item tryLoadDesc TARGET FILE HASH
@@ -74,12 +182,8 @@ Given a reset TARGET widget, a FILE name, and a HASH in which to store data, loa
 =cut
 
 sub tryLoadDesc {
-
-my $debug = 1;
-
 	my ($resettarget,$fn,$target,$ar) = @_;
 	my $orderkey = 0; # keep URLs in order
-# TODO store these description pairs in RItem objects
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn = "$odir/$fn";
 	return 1 unless (-e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
@@ -92,7 +196,7 @@ my $debug = 1;
 		$stat->push("One line found in file!");
 	}
 	my $count = 0;
-print "Processing " . scalar @them . " lines...";
+	$stat->push("Processing " . scalar @them . " lines...");
 	my $ti = RItem->new();
 	foreach my $line (@them) {
 		chomp $line;
@@ -101,11 +205,10 @@ print "Processing " . scalar @them . " lines...";
 		$k =~ s/\s//g; # no whitespace in keywords, please
 		return -1 if ($k eq "" || $2 eq ""); # if we couldn't parse this, we won't try to build a row, or even continue.
 		my $descact = 0;
+		my $i = scalar @$ar;
 		if ($k eq "desc") { # for each keyword, store data in hash
 			$descact = 1;
-			print "!$2!";
 			$ti->text($2);
-			print "> " . $ti->text();
 		} elsif ($descact && $k eq "---") { # this is another line of text
 			$ti->text($ti->text() . "\n$2");
 		} elsif ($k eq "url") { # the link/image that goes with the post
@@ -115,57 +218,36 @@ print "Processing " . scalar @them . " lines...";
 			defined $debug and print ":";
 			$count++;
 			$descact = 0;
-			push(@$ar,$ti); # store record
+			my $pi = RItem->new( title => $ti->{title}, text => $ti->{text}, link => $ti->{link}, ); # separate the item from this loop
+			$resettarget->insert( Button => # place button for adding...
+				text => "Add " . $pi->text(),
+				onClick => sub {
+					my $pr = labelBox($target,$pi->text(),$pi->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+					$pr->set( pack => { anchor => 'n', valignment => ta::Top } );
+					$pr->insert( Button => # which places button for removing...
+						text => "Remove",
+						onClick => sub { $pr->destroy(); return 0; },
+					);
+				}
+			) unless ($pi->title() eq "Unnamed");
+			push(@$ar,$pi); # store record
 			$ti = RItem->new( title => $2 ); # start new record, in case there are more items in this file
 		} else { # Oops! Error.
 			warn "\n[W] I found unexpected keyword $k with value $2.\n";
 		}
 #defined $debug and print "\n $k = $2...";
 	}
-	$stat->push("Found $count items...");
-	use Data::Dumper;
-	print Dumper $ar;
-
-devHelp(getGUI('mainWin'),"Loading description files");
-return 404;
-
-
-
-
-
-
-		if (-r $lfp . $img ) {
-# put both of these in a row object, along with the inputline for the description
-			$row->insert( Label => name => "$img", text => "Description for ");
-# replace this with an Image object, so we can set the zom factor and resize the image when the user clicks on it to see it so they can describe it.
-			my $pic = Prima::Image->new;
-			my $lfn = "$lfp$img";
-			$pic->load($lfn);
-#			$pic->set(scaling => 7); # ist::Hermite);
-			my $shower = $row->insert( Button => name => "$lfn", text => "$img",); # button for filename
-			$shower->set( onClick => sub {
-				defined $vp and $vp->destroy;
-				$cap->text($shower->text);
-				$vp = $ib->insert( ImageViewer =>
-					name => "i$img", zoom => $iz, width => $viewsize, height => $viewsize,
-					pack => {fill => 'none'}, image => $pic); $::application->yield(); });
-# put description inputline here.
-		} else {
-			$row->insert( Label => text => "$img could not be loaded for viewing." );
+	$resettarget->insert( Button => # place button for adding...
+		text => "Add " . $ti->text(),
+		onClick => sub {
+			my $pr = labelBox($target,$ti->text(),$ti->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+			$pr->insert( Button => # which places button for removing...
+				text => "Remove",
+				onClick => sub { $pr->destroy(); return 0; },
+			);
 		}
-		$row->insert( Label => text => ":");
-		my $desc = $row->insert( InputLine => width => 100, name => "$line", text => "" );
-		$desc->set(onLeave => sub { $$hashr{$okey}{desc} = $desc->text; });
-		$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store, not by what the button does but by causing the input to lose focus.
-#		$row->height($collapsed);
-		if ($hitserver) {
-			$stat->push("Waiting...");
-			Pwait($moment);
-			$hitserver = 0;
-		}
-	my $of = $outbox->insert( InputLine => text => "prayers.dsc", pack => { fill => 'x', expand => 1, },);
-	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 1, }, onClick => sub { my $ofn = $of->text; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn.");});
-	$stat->push("Done.");
+	) unless ($ti->title() eq "Unnamed");
+	$stat->push("Done loading $count items.");
 	return 0; # success!
 }
 print ".";
@@ -192,21 +274,33 @@ sub resetGrouping {
 	my $tar = []; # Target Array Reference
 	my $rows = [];
 	my $paner = $ordpage->insert( HBox => name => "panes", pack => {fill => 'both', expand => 1} );
-	my $lpane = $paner->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1} );
-	my $lister = $lpane->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1} );
-	my $rpane = $paner->insert( VBox => name => "Output", pack => {fill => 'both', expand => 1} );
-	my $grouper = $rpane->insert( VBox => name => "grouper", pack => {fill => 'both', expand => 1} );
+	my $lpane = $paner->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0} );
+	my $lister = $lpane->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") );
+	my $preview = $paner->insert( VBox => name => "preview", pack => {fill => 'both', expand => 1, ipad => 3, anchor => 'n', side => 'top'} );
+	$preview->backColor(PGK::convertColor("#99FF99"));
+	my $rpane = $paner->insert( VBox => name => "Output", pack => {fill => 'y', expand => 0} , backColor => PGK::convertColor("#ccFF99") );
+	my $grouper = $rpane->insert( VBox => name => "grouper", pack => {fill => 'both', expand => 1, ipad => 3} );
 	my $rowbox;
-	$lister->insert( Label => text => "Choose a file containing URLs:");
+	$lister->insert( Label => text => "Choose a description file:");
+	$grouper->insert( Label => text => "Choose a group file:");
+	my $newfile = $grouper->insert( HBox => name => "newbox", );
+	my $newil = $newfile->insert( InputLine => text => "unnamed" );
+	$newfile->insert( Button => text => "Create", onClick => sub {
+				my $f = $newil->text;
+				$grouper->destroy();
+				$f =~ s/\..+$//; # remove any existing extension
+				$f = "$f.rig"; # add RIG extension
+				my $error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows);
+				$error && $stat->push("An error occurred loading $f!"); });
 	my $stat = getGUI("status");
 	foreach my $f (@files) {
 		if ($f =~ /\.dsc/) { # description files
 			$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-				my $error = tryLoadDesc($lpane,$f,$rowbox,$tar);
+				my $error = tryLoadDesc($lpane,$f,$preview,$tar);
 				$error && $stat->push("An error occurred loading $f!"); });
 		} elsif ($f =~ /\.rig/) { # rotating image groups
 			$grouper->insert( Button => text => $f, onClick => sub { $grouper->destroy();
-				my $error = tryLoadGrouper($rpane,$f,$tar,$rows);
+				my $error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows);
 				$error && $stat->push("An error occurred loading $f!"); });
 		}
 	}
@@ -307,7 +401,7 @@ sub tryLoadInput {
 		}
 	}
 	my $of = $outbox->insert( InputLine => text => "prayers.dsc", pack => { fill => 'x', expand => 1, },);
-	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 1, }, onClick => sub { my $ofn = $of->text; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn.");});
+	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 1, }, onClick => sub { my $ofn = $of->text; $ofn =~ s/\..+$//; $ofn = "$ofn.dsc"; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn."); $resettarget->insert( Label => text => "Your file has been saved.", pack => {fill => 'both', expand => 1}); $resettarget->insert( Button => text => "Continue to Grouping tab", onClick => sub { getGUI('pager')->switchToPanel("Grouping"); } ); $resettarget->insert( Label => text => scalar %$hashr . " images.", pack => {fill => 'both', expand => 1}); });
 	$stat->push("Done.");
 	return 0; # success!
 }
@@ -321,9 +415,6 @@ Given a FILEname and a HASHref to a list of descriptions, converts the list into
 
 sub saveDescs {
 	my ($fn,$hr,$overwrite) = @_;
-	use Data::Dumper;
-	print "If this were finished, I'd save the following data to lib/$fn...";
-	print Dumper $hr;
 	my $n = length keys %$hr;
 	my @lines = ();
 	my $verbose = FIO::config('Debug','v');
@@ -350,7 +441,8 @@ Dies on error opening given directory.
 =cut
 
 sub resetDescribing {
-	my ($imgpage) = @_;
+	my ($args) = @_;
+	my $imgpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
 	$imgpage->empty(); # clear page.
 	opendir(DIR,"./") or die "Bad ./: $!";
 	my ($listbox, $delaybox, $sizer);
@@ -394,18 +486,18 @@ sub populateMainWin {
 	my $pager = $win->insert( Pager => name => 'Pages', pack => { fill => 'both', expand => 1}, );
 	$pager->build(@tabs);
 	my $i = 1;
-	my $color = Common::getColors(11,1);
+	my $color = Common::getColors(5,1);
 	my $currpage = 0; # placeholder
 
 	# Image tab
 	my $imgpage = $pager->insert_to_page($currpage++,VBox =>
-		backColor => ColorRow::stringToColor($color),
+		backColor => PGK::convertColor($color),
 		pack => { fill => 'both', },
 	);
-	resetDescribing($imgpage);
+	$pager->setSwitchAction("Describing",\&resetDescribing,$imgpage);
 
 	# Grouping tab
-	$color = Common::getColors(($i++ % 2 ? 0 : 6),1);
+	$color = Common::getColors(6,1);
 	my $grppage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
@@ -414,7 +506,7 @@ sub populateMainWin {
 	$pager->setSwitchAction("Grouping",\&resetGrouping,$grppage);
 
 	# Ordering tab
-	$color = Common::getColors(($i++ % 2 ? 0 : 10),1);
+	$color = Common::getColors(10,1);
 	my $ordpage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
@@ -423,7 +515,7 @@ sub populateMainWin {
 	$pager->setSwitchAction("Ordering",\&resetOrdering,$ordpage); # reload the description buttons whenever we switch to this page, in case the user made a new dsc file on the Describing tab.
 
 	# Publishing tab
-	$color = Common::getColors(($i++ % 2 ? 0 : 9),1);
+	$color = Common::getColors(9,1);
 	my $pubpage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
@@ -431,13 +523,15 @@ sub populateMainWin {
 	my $pp = labelBox($pubpage,"Publishing page not yet coded.",'r','H', boxfill => 'both', boxex => 1, labfill => 'x', labex => 1);
 
 	# Scheduling tab
-	$color = Common::getColors(($i++ % 2 ? 0 : 8),1);
+	$color = Common::getColors(8,1);
 	my $schpage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
 	);
 	my $sp = labelBox($schpage,"Scheduling page not yet coded.",'r','H', boxfill => 'x', boxex => 1, labfill => 'x', labex => 1);
 	$color = Common::getColors(($i++ % 2 ? 0 : 7),1);
+	
+	$pager->switchToPanel("Describing");
 	$$gui{pager} = $pager;
 	return 0;
 }

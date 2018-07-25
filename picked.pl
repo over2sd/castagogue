@@ -9,10 +9,10 @@ use utf8;
 ####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
 
 my $PROGRAMNAME = "Castapic";
-my $version = "0.003a";
+my $version = "0.004a";
 
 $|++; # Immediate STDOUT, maybe?
-print "[I] Castapic v$version is running.";
+print "[I] $PROGRAMNAME v$version is running.";
 flush STDOUT;
 
 use Getopt::Long;
