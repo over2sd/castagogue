@@ -57,8 +57,50 @@ sub resetOrdering {
 }
 print ".";
 
+=item itemIntoRow
+
+
+=cut
+
 sub itemIntoRow {
 	my ($rows,$index,$iname,$link,$desc) = @_;
+	$index = ($index == -1 ? $#$rows : $index); # -1 means last row
+	my $rowob = $$rows[$index] or die "No row object found in rows array!";
+	my $ti = $rowob->insert( HBox => backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
+	$ti->insert( InputLine => text => Common::shorten("$desc",15,3), pack => { fill => 'none', expand => 0, }  );
+	$ti{inm} = $iname;
+	$ti{link} = $link;
+	$ti{desc} = $desc;
+	PGK::killButton($ti, sub { $ti->destroy(); }); #delete row from page
+}
+print ".";
+
+sub slurpPane {
+	my ($prev,$target,$rows,$index,$items) = @_;
+	my @rows = $prev->get_widgets(); # prev is expected to be a VBox. Grab its children.
+	foreach my $r (@rows) {
+		print "The name is " . $r->name() . "..."; # the row's name will match the item's name...
+		my $item;
+		foreach my $it (@$items) {
+			if ($it->name() eq $r->name()) {
+				$item = $it;
+				last;
+			}
+		}
+		my @box = $r->get_widgets(); # each row should be an HBox containing a Label and a Button.
+		defined $item and print "Seeking " . $box[0]->text() . " => " . $item->link() . "...\n"; # the row's label's text should match the item's text.
+		defined $item and itemIntoRow($rows,$index,$item->name,$item->link,$box[0]->text());
+	}
+	$prev->empty();
+}
+print ".";
+
+sub slurpButton {
+	my ($target,$starget,$rows,$index,$items,$sz,$fill,$expand) = @_;
+	$sz = ($sz ? $sz : 24);
+	$fill = ($fill ? $fill : 'none');
+	$expand = ($expand ? $expand : 0);
+	return $target->insert( Button => text => ">>>", onClick => sub { return slurpPane($starget,$target,$rows,$index,$items); }, pack => { fill => $fill, expand => $expand, }, width => $sz, height => $sz );
 }
 print ".";
 
@@ -69,8 +111,6 @@ Given a reset TARGET widget, a FILE name, a HASHREF of storable values, and a HA
 =cut
 #$rpane,$f,$preview,$tar,$rows);
 sub tryLoadGrouper {
-
-use Data::Dumper;
 	my ($target,$fn,$prev,$items,$rows) = @_;
 	my $orderkey = 0; # keep URLs in order
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
@@ -94,8 +134,15 @@ use Data::Dumper;
 	my $foundrow = 0;
 # rowbox (( rownameinput rowkillbutton items [[ VBoxes moved over from preview? ]] ))
 
-	devHelp(getGUI('mainWin'),"Loading group files");
-return 404;
+	$target->insert( Button => text => "Add", onClick => sub {
+		my $row = $target->insert( VBox => name => "rownew", backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
+		$row->insert( InputLine => text => "Unnamed ($foundrow)", );
+		my $kill = $foundrow; # maintain scope for kill button
+		slurpButton($row,$prev,$rows,$kill,$items,undef,'x');
+		PGK::killButton($row, sub { splice(@$rows,$kill,1); $row->destroy(); },undef,'x'); #delete row from page and from array
+		push(@$rows,$row);
+		$foundrow++;
+	} );
 	foreach my $line (@them) {
 		chomp $line;
 		$line =~ m/(.*?\=)?(.*)/; # find keywords
@@ -126,10 +173,11 @@ return 404;
 		} elsif ($k eq "row") { # should start the row record.
 			itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
 			($link,$desc,$itemname) = (undef,undef,undef); # clear values so I can check for definition
-			my $row = $target->insert( VBox => backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
+			my $row = $target->insert( VBox => name => "row$foundrow", backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
 			$row->insert( InputLine => text => $2 );
 			my $kill = $foundrow; # maintain scope for kill button
-			$row->insert( Button => text => "X", onClick => sub { splice(@$rows,$kill,1); $row->destroy(); } ); #delete row from page and from array
+			slurpButton($row,$prev,$rows,$kill,$items,undef,'x');
+			PGK::killButton($row, sub { splice(@$rows,$kill,1); $row->destroy(); },undef,'x'); #delete row from page and from array
 			$foundrow++;
 			push(@$rows,$row);
 		} elsif ($k eq "item") { # should start the item record.
@@ -142,37 +190,21 @@ return 404;
 			defined $debug and print ":";
 			$count++;
 			$descact = 0;
+			$itemname = $2;
+		} elsif ("$k" eq "next") {
+			; # probably the end of the file. Do nothing.
 		} else { # Oops! Error.
 			warn "\n[W] I found unexpected keyword $k with value $2.\n";
 		}
 #defined $debug and print "\n $k = $2...";
 	}
-	$resettarget->insert( Button => # place button for adding...
-		text => "Add " . $ti->text(),
-		onClick => sub {
-			my $pr = labelBox($target,$ti->text(),$ti->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
-			$pr->insert( Button => # which places button for removing...
-				text => "Remove",
-				onClick => sub { $pr->destroy(); return 0; },
-			);
-		}
-	) unless ($ti->title() eq "Unnamed");
+	itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
+	$prev->empty();
+	my $filebox = $target->insert( InputLine => text => "$fn.grp" );
+	$target->insert( Button => text => "Save", onClick => sub { devHelp(getGUI('mainWin'),"Saving groups"); } );
 	$stat->push("Done loading $count items.");
 	return 0; # success!
 
-	my @rows = $prev->get_widgets(); # prev is expected to be a VBox. Grab its children.
-	foreach my $r (@rows) {
-		print "The name is " . $r->name() . "..."; # the row's name will match the item's name...
-		my $item;
-		foreach my $it (@$items) {
-			if ($it->name() eq $r->name()) {
-				$item = $it;
-				last;
-			}
-		}
-		my @box = $r->get_widgets(); # each row should be an HBox containing a Label and a Button.
-		defined $item and print "Seeking " . $box[0]->text() . " => " . $item->link() . "...\n"; # the row's label's text should match the item's text.
-	}
 }
 
 =item tryLoadDesc TARGET FILE HASH
@@ -273,6 +305,7 @@ sub resetGrouping {
 	closedir(DIR);
 	my $tar = []; # Target Array Reference
 	my $rows = [];
+	$ordpage->insert( Label => text => "Grouping", pack => { fill => 'x', expand => 0}, );
 	my $paner = $ordpage->insert( HBox => name => "panes", pack => {fill => 'both', expand => 1} );
 	my $lpane = $paner->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0} );
 	my $lister = $lpane->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") );
@@ -446,6 +479,7 @@ sub resetDescribing {
 	$imgpage->empty(); # clear page.
 	opendir(DIR,"./") or die "Bad ./: $!";
 	my ($listbox, $delaybox, $sizer);
+	$imgpage->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, );
 	my $filebox = labelBox($imgpage,"Seconds between fetches",'filechoice','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
 #	my $fnb = $filebox->insert( InputLine => name => 'thisfile');
 #	my $dl = $filebox->insert( Label => text => "Seconds between fetches");
@@ -486,7 +520,7 @@ sub populateMainWin {
 	my $pager = $win->insert( Pager => name => 'Pages', pack => { fill => 'both', expand => 1}, );
 	$pager->build(@tabs);
 	my $i = 1;
-	my $color = Common::getColors(5,1);
+	my $color = Common::getColors(5,1,1);
 	my $currpage = 0; # placeholder
 
 	# Image tab
@@ -497,7 +531,7 @@ sub populateMainWin {
 	$pager->setSwitchAction("Describing",\&resetDescribing,$imgpage);
 
 	# Grouping tab
-	$color = Common::getColors(6,1);
+	$color = Common::getColors(6,1,1);
 	my $grppage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
@@ -506,7 +540,7 @@ sub populateMainWin {
 	$pager->setSwitchAction("Grouping",\&resetGrouping,$grppage);
 
 	# Ordering tab
-	$color = Common::getColors(10,1);
+	$color = Common::getColors(10,1,1);
 	my $ordpage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
@@ -515,7 +549,7 @@ sub populateMainWin {
 	$pager->setSwitchAction("Ordering",\&resetOrdering,$ordpage); # reload the description buttons whenever we switch to this page, in case the user made a new dsc file on the Describing tab.
 
 	# Publishing tab
-	$color = Common::getColors(9,1);
+	$color = Common::getColors(9,1,1);
 	my $pubpage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
@@ -523,14 +557,14 @@ sub populateMainWin {
 	my $pp = labelBox($pubpage,"Publishing page not yet coded.",'r','H', boxfill => 'both', boxex => 1, labfill => 'x', labex => 1);
 
 	# Scheduling tab
-	$color = Common::getColors(8,1);
+	$color = Common::getColors(8,1,1);
 	my $schpage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
 	);
 	my $sp = labelBox($schpage,"Scheduling page not yet coded.",'r','H', boxfill => 'x', boxex => 1, labfill => 'x', labex => 1);
 	$color = Common::getColors(($i++ % 2 ? 0 : 7),1);
-	
+
 	$pager->switchToPanel("Describing");
 	$$gui{pager} = $pager;
 	return 0;

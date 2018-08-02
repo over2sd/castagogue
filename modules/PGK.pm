@@ -1600,6 +1600,20 @@ sub quickBox {
 }
 print ".";
 
+=item killButton TARGET ACTION [FILL] [EXPAND]
+	Given a TARGET and an ACTION, creates a small, square button that says "X" and does ACTION when pressed.
+	A FILL and/or EXPAND option may be given, which will modify the default packing.
+	Returns the created button.
+=cut
+sub killButton {
+	my ($target,$onclickaction,$sz,$fill,$expand) = @_;
+	$sz = ($sz ? $sz : 15);
+	$fill = ($fill ? $fill : 'none');
+	$expand = ($expand ? $expand : 0);
+	return $target->insert( Button => text => "X", onClick => $onclickaction, pack => { fill => $fill, expand => $expand, }, width => $sz, height => $sz );
+}
+print ".";
+
 =item slidebox WINDOW TITLE TEXT PARAMETERS
 
 Makes and displays a dialog owned by WINDOW with TITLE in the titlebar,
