@@ -39,3 +39,5 @@ install DateTime
 install DateTime::Format::Duration;
 
 install WWW::Mechanize
+
+install Perl::Prima (only required for GUI program picked.pl)

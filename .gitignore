@@ -7,7 +7,7 @@ schedule/*day.txt
 schedule/20*-*-*.txt
 itn/
 lib/
-ulist.txt
+ulist*.txt
 rssnew.xml
 
 !Build/

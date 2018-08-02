@@ -104,6 +104,11 @@ sub slurpButton {
 }
 print ".";
 
+sub trySaveGroup {
+	devHelp(getGUI('mainWin'),"Saving groups");
+}
+print ".";
+
 =item tryLoadGrouper TARGET FILE LISTPANE HASHREF HASHREF
 
 Given a reset TARGET widget, a FILE name, a HASHREF of storable values, and a HASHREF in which to store data, loads the rows from a file and displays them for output addition
@@ -200,12 +205,33 @@ sub tryLoadGrouper {
 	}
 	itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
 	$prev->empty();
+	$fn =~ s/\..+$//; # remove any extension
 	my $filebox = $target->insert( InputLine => text => "$fn.grp" );
-	$target->insert( Button => text => "Save", onClick => sub { devHelp(getGUI('mainWin'),"Saving groups"); } );
+	$target->insert( Button => text => "Save", onClick => sub { trySaveGroup($target,$rows,$filebox) } );
 	$stat->push("Done loading $count items.");
 	return 0; # success!
 
 }
+print ".";
+
+sub refreshDescList {
+	my ($resettarget,$fn,$target,$ar) = @_;
+	$resettarget->empty(); # clear the box
+	my $odir = (FIO::config('Disk','rotatedir') or "lib"); # pick the directory
+	my @files = FIO::dir2arr($odir,"dsc"); # get the list
+	my $lister = $resettarget->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") ); # make new list box
+	$lister->insert( Label => text => "Choose a description file:"); # Title the new box
+	my $stat = getGUI("status");
+	my $text = "building buttons..";
+	foreach my $f (@files) {
+			makeDescButton($lister,$f,$lpane,$preview,$tar);
+			$text = "$text.";
+			$stat->push($text);
+	}
+	$stat->push("Done. Pick a file.");
+	return 0;
+}
+print ".";
 
 =item tryLoadDesc TARGET FILE HASH
 
@@ -228,6 +254,7 @@ sub tryLoadDesc {
 		$stat->push("One line found in file!");
 	}
 	my $count = 0;
+	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$stat->push("Processing " . scalar @them . " lines...");
 	my $ti = RItem->new();
 	foreach my $line (@them) {
@@ -253,6 +280,7 @@ sub tryLoadDesc {
 			my $pi = RItem->new( title => $ti->{title}, text => $ti->{text}, link => $ti->{link}, ); # separate the item from this loop
 			$resettarget->insert( Button => # place button for adding...
 				text => "Add " . $pi->text(),
+				height => $buttonheight,
 				onClick => sub {
 					my $pr = labelBox($target,$pi->text(),$pi->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
 					$pr->set( pack => { anchor => 'n', valignment => ta::Top } );
@@ -279,8 +307,21 @@ sub tryLoadDesc {
 			);
 		}
 	) unless ($ti->title() eq "Unnamed");
+	$resettarget->insert( Button => text => "Pick different file", onClick => sub { refreshDescList($resettarget,$fn,$target,$ar); }, );
 	$stat->push("Done loading $count items.");
 	return 0; # success!
+}
+print ".";
+
+=item makeDescButton TARGET FILE PARENT PREVIEW ARRAYREF
+	Makes a button for each FILE, to load its items into a given TARGET with buttons to copy that item into the PREVIEW and the ARRAYREF. Said items have the option of clearing the PARENT.
+=cut
+sub makeDescButton {
+	my ($lister,$f,$lpane,$preview,$tar) = @_;
+	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
+	$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
+		my $error = tryLoadDesc($lpane,$f,$preview,$tar);
+		$error && $stat->push("An error occurred loading $f!"); }, height => $buttonheight, );
 }
 print ".";
 
@@ -297,14 +338,10 @@ sub resetGrouping {
 	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
 	$ordpage->empty(); # start with a blank slate
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
-	opendir(DIR,$odir) or die $!;
-	my @files = grep {
-#		/\.dsc$/ && # only show description files.
-			-f "$odir/$_"
-		} readdir(DIR);
-	closedir(DIR);
+	my @files = FIO::dir2arr($odir);
 	my $tar = []; # Target Array Reference
 	my $rows = [];
+	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$ordpage->insert( Label => text => "Grouping", pack => { fill => 'x', expand => 0}, );
 	my $paner = $ordpage->insert( HBox => name => "panes", pack => {fill => 'both', expand => 1} );
 	my $lpane = $paner->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0} );
@@ -328,13 +365,11 @@ sub resetGrouping {
 	my $stat = getGUI("status");
 	foreach my $f (@files) {
 		if ($f =~ /\.dsc/) { # description files
-			$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-				my $error = tryLoadDesc($lpane,$f,$preview,$tar);
-				$error && $stat->push("An error occurred loading $f!"); });
+			makeDescButton($lister,$f,$lpane,$preview,$tar);
 		} elsif ($f =~ /\.rig/) { # rotating image groups
 			$grouper->insert( Button => text => $f, onClick => sub { $grouper->destroy();
 				my $error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows);
-				$error && $stat->push("An error occurred loading $f!"); });
+				$error && $stat->push("An error occurred loading $f!"); }, height => $buttonheight, );
 		}
 	}
 	my $op = labelBox($ordpage,"Ordering page not yet coded.",'r','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
@@ -355,10 +390,14 @@ sub tryLoadInput {
 	my $hitserver = 0;
 	my $orderkey = 0; # keep URLs in order
 	$viewsize = $viewsize->value; # object to int
+	$resettarget->empty(); # clear page.
+	Pwait(0.1); # even though this slows the process by a tenth of a second, it lets the user see progress, which makes it feel less like a long wait.
+	$resettarget->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, );
 	return 0 unless (Common::findIn($fn,@openfiles) < 0); # don't try to load if already loaded that file.
 	return 0 unless (-e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
 	my $thumb = (FIO::config('Net','thumbdir') or "itn");
 	my $stat = getGUI('status');
+	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$stat->push("Trying to load $fn...");
 	my @them = FIO::readFile($fn,$stat);
 	if ($#them == 0) {
@@ -393,6 +432,7 @@ sub tryLoadInput {
 		} else {
 			$stat->push("Loading image $img from cache");
 		}
+		Pwait(0.1); # even though this slows the process by a tenth of a second, it lets the user see each button appear, which prevents the appearance the program has hung up.
 		if (-r $lfp . $img ) {
 # put both of these in a row object, along with the inputline for the description
 			$row->insert( Label => name => "$img", text => "Description for ");
@@ -411,7 +451,7 @@ sub tryLoadInput {
 				my $iz = $viewsize / $pic->height; # get appropriate scale
 				$pic->size($viewsize,$pic->width * $iz); # resize the image to fit our viewport
 			}
-			my $shower = $row->insert( Button => name => "$lfn", text => "$img",); # button for filename
+			my $shower = $row->insert( Button => name => "$lfn", text => "$img", height => $buttonheight, ); # button for filename
 			$shower->set( onClick => sub {
 				defined $vp and $vp->destroy;
 				$cap->text($shower->text);
@@ -425,7 +465,7 @@ sub tryLoadInput {
 		$row->insert( Label => text => ":");
 		my $desc = $row->insert( InputLine => width => 100, name => "$line", text => "" );
 		$desc->set(onLeave => sub { $$hashr{$okey}{desc} = $desc->text; });
-		$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store, not by what the button does but by causing the input to lose focus.
+#		$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store, not by what the button does but by causing the input to lose focus.
 #		$row->height($collapsed);
 		if ($hitserver) {
 			$stat->push("Waiting...");
@@ -477,7 +517,7 @@ sub resetDescribing {
 	my ($args) = @_;
 	my $imgpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
 	$imgpage->empty(); # clear page.
-	opendir(DIR,"./") or die "Bad ./: $!";
+	my @files = FIO::dir2arr("./","txt"); # get list of .txt files
 	my ($listbox, $delaybox, $sizer);
 	$imgpage->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, );
 	my $filebox = labelBox($imgpage,"Seconds between fetches",'filechoice','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
@@ -488,12 +528,8 @@ sub resetDescribing {
 	$sizer = $filebox->insert( SpinEdit => name => 'size', max => 2048, min => 100, step => 50, value => 200);
 	my $lister = $imgpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1} );
 	$lister->insert( Label => text => "Choose a file containing URLs:");
-	my @files = grep {
-		!/^TODO/ && # Not the TODO file
-		/\.txt$/ # all text files
-	} readdir(DIR);
-	closedir(DIR);
 	foreach my $f (@files) {
+		next if $f =~ /^TODO/; # Not the TODO file
 		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
 			my $error = tryLoadInput($imgpage,$f,$delaybox,\%images,$sizer);
 			$error and sayBox(getGUI("mainWin"),"An error occurred trying to load $f.\nPlease check the file to ensure it contains valid URLS, one on each line.");

@@ -191,5 +191,24 @@ sub Webget {
 }
 print ".";
 
+sub dir2arr {
+	my ($odir,$ext) = @_;
+	opendir(DIR,$odir) or die $!;
+	my @files;
+#print "Looking for " . ($ext ? $ext : "all") . " files in $odir...";
+	if (defined $ext and "$ext" =~ /\w+/) {
+		@files = grep {
+			/\.\Q$ext\E$/ && # only show files with this extension.
+			-f "$odir/$_"
+		} readdir(DIR);
+	} else {
+		@files = grep { -f "$odir/$_" } readdir(DIR); # show all files.
+	}
+	closedir(DIR);
+print scalar @files . " files found.";
+	return @files; # return array of file names.
+}
+print ".";
+
 print " OK; ";
 1;
