@@ -1102,6 +1102,12 @@ sub setSwitchAction {
 	}
 }
 
+=item SBox
+
+=cut
+package SBox;
+
+
 package PGK;
 
 =head2 PGK functions
@@ -1562,6 +1568,7 @@ sub insertDateWidget {
 	require Prima::Calendar;
 	my $smallbox = $target->insert( HBox => sizeMin => [150,18], sizeMax => [300,50], pack => { fill => ($$extra{boxfill} or 'none'), expand => ($$extra{boxex} or 0), });
 	$smallbox->insert( Label => text => $$extra{label} ) if (defined $$extra{label});
+	$smallbox->set( backColor => PGK::convertColor($$extra{bgcol})) if (defined $$extra{bgcol});
 	my $calent = $smallbox->insert( InputLine => text => ($$extra{default} or '0000-00-00'), name => ($$extra{name} or 'imadate') );
 	my $calbut = $smallbox->insert( SpeedButton => name => ($$extra{buttonname} or 'showcal'), onClick => sub {
 		my $calwin = Prima::Dialog->create( size => [ 250, 275 ], text => "Choose Date",);
@@ -1572,6 +1579,7 @@ sub insertDateWidget {
 		$calwin->execute;
 		$calwin->destroy;
 	}, imageFile => 'modules/cal-icon.png', );
+	$calbut->set( backColor => PGK::convertColor($$extra{bgcol})) if (defined $$extra{bgcol});
 	return $calent;
 }
 print ".";
@@ -1706,6 +1714,7 @@ sub resetScroll {
 	$sb->value(0);
 	$sb->notify(q(Change));
 }
+print ".";
 
 sub scrollit {
 	my ($bar,$delta) = @_;

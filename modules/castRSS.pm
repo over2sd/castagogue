@@ -245,7 +245,7 @@ sub processRange {
 	}
 	($ds < $dp) && die "I cannot go backward in time. Sorry.\n";
 	infMes("Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":");
-	while ($dp < $ds) {
+	while ($dp <= $ds) {
 		processDay($dp,$r,$out);
 		$dp = $dp + DateTime::Duration->new( days=> 1 );
 	}

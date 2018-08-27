@@ -9,7 +9,10 @@ use FIO qw( config );
 use PGK;
 use Prima qw( ImageViewer Sliders );
 use Common qw( missing );
+use Options;
 use RItem;
+use strict;
+use warnings;
 
 =head1 NAME
 
@@ -27,6 +30,83 @@ package PGUI;
 
 my @openfiles = [];
 
+=item resetScheduling TARGET
+
+Given a TARGET widget, generates the list widgets needed to perform the Scheduling page's functions.
+Returns 0 on completion.
+Dies on error opening library directory.
+
+=cut
+
+sub resetScheduling {
+	my ($args) = @_;
+	my $schpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	my $bgcol = $$args[1];
+	$schpage->empty(); # start with a blank slate
+	my $panes = $schpage->insert( HBox => name => 'splitter',  pack => { fill => 'both', expand => 0 }, );
+	my $lister = $panes->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol),  );
+	$lister->insert( Label => text => "Choose a file of image descriptions:");
+	my $tar = [];
+	my $sched = 1;
+	my $stage = $panes->insert( VBox => name => "stager", pack => { fill => 'both' }, );
+	my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
+	my $tb = labelBox($stage,"Content: ",'H', boxfill => 'x', boxex => 1, labfill => 'x', labex => 1, );
+	my $tbi = $tb->insert( Edit => text => "This is a wonderful place to put the final description text.", pack => { fill => 'both' }, );
+	refreshDescList($lister,$prev,$tar,$sched);
+
+	my $op = labelBox($schpage,"Ordering page not yet coded.",'r','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 1);
+# This page will be for scheduling specific images with specific dates
+# buttons to load dsc files
+# a pane for dsc files to load into
+# when a button from a dsc file is clicked, it goes into a new pane,
+#	a date widget sets the date
+# This is a special date widget that allows selecting a day of the week, instead.
+# a box shows the item's description, with the date applied into its description, if it contains placeholders
+# box allows editing of description
+# image preview for item
+# another pane shows files affected by the date selected, along with the items those files already contain.
+# a group of buttons to ***Write the Item into Dated File in Schedule Directory** "Save to <date>.txt" "Save to <weekday>.txt" "Save to [1st2nd3rd4th] Weekday"
+
+}
+print ".";
+
+=item resetPublishing TARGET
+
+Given a TARGET widget, generates the list widgets needed to perform the Publishing page's functions.
+Returns 0 on completion.
+Dies on error opening library directory.
+
+=cut
+
+sub resetPublishing {
+	my ($args) = @_;
+	my $pubpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	my $bgcol = $$args[1];
+	$pubpage->empty(); # start with a blank slate
+	my $box = $pubpage->insert( VBox => name => "pubpage", backColor =>  PGK::convertColor($bgcol) + 32 );
+	my $ofile = labelBox($box,"Output RSS: ",'fileout','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
+	$ofile->set(backColor => PGK::convertColor($bgcol)); # output filename
+	my $ofn = $ofile->insert( InputLine => text => "rssnew.xml");
+	my $ifile = labelBox($box,"Existing RSS",'filein','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0); # RSS template filename
+	$ifile->set(backColor => PGK::convertColor($bgcol));
+	my $ifn = $ifile->insert( InputLine => text => "rss.xml");
+	my $datebox = $box->insert( HBox => name => "dates", backColor =>  PGK::convertColor($bgcol) + 16 );
+	my $datefrom = PGK::insertDateWidget($datebox,undef,{ label => "From ", bgcol => $bgcol, }); # start date
+	my $dateto = PGK::insertDateWidget($datebox,undef,{label => " to ", bgcol => $bgcol, }); # end date
+	my $nextbox = labelBox($box,"Next ID",'nextid','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
+	$nextbox->set(backColor => PGK::convertColor($bgcol));
+	my $nextid = $nextbox->insert( SpinEdit => name => 'nextid', max => 9999999, min => 0, step => 20, value => (FIO::config('Main','nextid') or 1)); # a spinner for the next ID
+	$box->insert( Button => text => "Prepare...", onClick => sub { devHelp(getGUI('mainWin'),"Preparing RSS feeds"); }, );
+# VBox to hold RItems
+# each existing RSS item will be loaded, given a different background color than generated items.
+# each RItem row should have a button to remove that item.
+# each RItem should have buttons to edit values.
+# svae button to write items to RSS
+
+	my $op = labelBox($pubpage,"Publishing page not yet coded.",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+}
+print ".";
+
 =item resetOrdering TARGET
 
 Given a TARGET widget, generates the list widgets needed to perform the Ordering page's functions.
@@ -38,6 +118,7 @@ Dies on error opening library directory.
 sub resetOrdering {
 	my ($args) = @_;
 	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	my $bgcol = $$args[1];
 	$ordpage->empty(); # start with a blank slate
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	opendir(DIR,$odir) or die $!;
@@ -46,13 +127,25 @@ sub resetOrdering {
 		&& -f "$odir/$_"
 		} readdir(DIR);
 	closedir(DIR);
-	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1} );
+	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1}, backColor => PGK::convertColor($bgcol),  );
 	$lister->insert( Label => text => "Choose a file containing URLs:");
 	foreach my $f (@files) {
 		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
 #			tryLoadGroup($ordpage,$f);
 		});
 	}
+	$ordpage->insert( Label => text => "Ordering", pack => { fill => 'x', expand => 0}, );
+	my $lpane = $ordpage->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol),  );
+# Group will have:
+	my $gtype = $lpane->insert( XButtons => name => "group type"); # an XButton set to select ordering
+	$gtype->arrange("left"); # horizontal
+	 my @types = (0,"none",1,"striped",2,"grouped",3,"mixed",4,"sequenced"); # defining the buttons
+	 my $def = 1; # selecting default
+	 $gtype->build("Group Type:",$def,@types); # show me the buttons
+	my $calent = PGK::insertDateWidget($lpane,undef,{ label => "Starting Date:", }, ); # a date widget to show the starting date of the ordering (used for sequenced groups)
+	my $randbut = $lpane->insert( Button => text => "Produce Order", onClick => sub { 	devHelp(getGUI('mainWin'),"Generating an order"); },); # a randomize button to generate a new sequence.
+	my $sequencer = $lpane->insert( InputLine => name => 'seq', text => '', ); # an InputLine to hold the sequencing.
+	my $saver = $lpane->insert( Button => text => "Save", onClick => sub { devHelp(getGUI('mainWin'),"Saving a sequence"); }, ); # a button to save group into a group file.
 	my $op = labelBox($ordpage,"Ordering page not yet coded.",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
 }
 print ".";
@@ -66,11 +159,11 @@ sub itemIntoRow {
 	my ($rows,$index,$iname,$link,$desc) = @_;
 	$index = ($index == -1 ? $#$rows : $index); # -1 means last row
 	my $rowob = $$rows[$index] or die "No row object found in rows array!";
-	my $ti = $rowob->insert( HBox => backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
+	my $ti = $rowob->insert( HBox => backColor => PGK::convertColor(Common::getColors(($index % 2 ? 5 : 6),1)), );
 	$ti->insert( InputLine => text => Common::shorten("$desc",15,3), pack => { fill => 'none', expand => 0, }  );
-	$ti{inm} = $iname;
-	$ti{link} = $link;
-	$ti{desc} = $desc;
+	$ti->{inm} = $iname;
+	$ti->{link} = $link;
+	$ti->{desc} = $desc;
 	PGK::killButton($ti, sub { $ti->destroy(); }); #delete row from page
 }
 print ".";
@@ -116,7 +209,7 @@ Given a reset TARGET widget, a FILE name, a HASHREF of storable values, and a HA
 =cut
 #$rpane,$f,$preview,$tar,$rows);
 sub tryLoadGrouper {
-	my ($target,$fn,$prev,$items,$rows) = @_;
+	my ($target,$fn,$prev,$items,$rows,$debug) = @_;
 	my $orderkey = 0; # keep URLs in order
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn = "$odir/$fn";
@@ -135,7 +228,7 @@ sub tryLoadGrouper {
 	}
 	$stat->push("Processing " . scalar @them . " lines...");
 	my ($rowname,$nextpair,$desc,$link,$itemname,$rbox);
-	my $rows = 0;
+	my $count =0;
 	my $foundrow = 0;
 # rowbox (( rownameinput rowkillbutton items [[ VBoxes moved over from preview? ]] ))
 
@@ -192,14 +285,14 @@ sub tryLoadGrouper {
 			}
 			itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
 			($link,$desc,$itemname) = (undef,undef,undef); # clear values so I can check for definition
-			defined $debug and print ":";
+			(defined $debug) and print ":";
 			$count++;
 			$descact = 0;
 			$itemname = $2;
 		} elsif ("$k" eq "next") {
 			; # probably the end of the file. Do nothing.
 		} else { # Oops! Error.
-			warn "\n[W] I found unexpected keyword $k with value $2.\n";
+			warn "\n[W] I found unexpected keyword $k with value $2 in $fn" . Common::lineNo();
 		}
 #defined $debug and print "\n $k = $2...";
 	}
@@ -215,8 +308,9 @@ sub tryLoadGrouper {
 print ".";
 
 sub refreshDescList {
-	my ($resettarget,$fn,$target,$ar) = @_;
+	my ($resettarget,$target,$ar,$sched) = @_;
 	$resettarget->empty(); # clear the box
+	print ")RT: " . $resettarget->name . "...";
 	my $odir = (FIO::config('Disk','rotatedir') or "lib"); # pick the directory
 	my @files = FIO::dir2arr($odir,"dsc"); # get the list
 	my $lister = $resettarget->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") ); # make new list box
@@ -224,7 +318,7 @@ sub refreshDescList {
 	my $stat = getGUI("status");
 	my $text = "building buttons..";
 	foreach my $f (@files) {
-			makeDescButton($lister,$f,$lpane,$preview,$tar);
+			makeDescButton($lister,$f,$resettarget,$target,$ar,$sched);
 			$text = "$text.";
 			$stat->push($text);
 	}
@@ -240,7 +334,7 @@ Given a reset TARGET widget, a FILE name, and a HASH in which to store data, loa
 =cut
 
 sub tryLoadDesc {
-	my ($resettarget,$fn,$target,$ar) = @_;
+	my ($resettarget,$fn,$target,$ar,$sched,$debug) = @_;
 	my $orderkey = 0; # keep URLs in order
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn = "$odir/$fn";
@@ -256,6 +350,7 @@ sub tryLoadDesc {
 	my $count = 0;
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$stat->push("Processing " . scalar @them . " lines...");
+	print "RT: " . $resettarget->name . "...";
 	my $ti = RItem->new();
 	foreach my $line (@them) {
 		chomp $line;
@@ -274,7 +369,7 @@ sub tryLoadDesc {
 			$ti->link($2);
 			$descact = 0;
 		} elsif ($k eq "item") { # should start the item record.
-			defined $debug and print ":";
+			(defined $debug) and print ":";
 			$count++;
 			$descact = 0;
 			my $pi = RItem->new( title => $ti->{title}, text => $ti->{text}, link => $ti->{link}, ); # separate the item from this loop
@@ -282,13 +377,31 @@ sub tryLoadDesc {
 				text => "Add " . $pi->text(),
 				height => $buttonheight,
 				onClick => sub {
-					my $pr = labelBox($target,$pi->text(),$pi->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
-					$pr->set( pack => { anchor => 'n', valignment => ta::Top } );
-					$pr->insert( Button => # which places button for removing...
-						text => "Remove",
-						onClick => sub { $pr->destroy(); return 0; },
-					);
-				}
+					my $pr;
+					if ($sched) {
+						my $fill = 0; # filler variable
+						my ($error,$server,$img,$lfp) = fetchapic($pi->link,$fill,$stat);
+						return $error if $error;
+						my $viewsize = 100;
+						my $pic = Prima::Image->new;
+						my $lfn = "$lfp$img";
+						$pic->load($lfn);
+						$pr = labelBox($target,$pi->text(),$pi->title(),'V', boxfill => 'both', boxex => 0, labfill => 'x', labex => 1);
+						if (-r $lfp . $img ) {
+							my ($pic,$iz) = showapic($lfp,$img,$viewsize);
+							$pr->insert( ImageViewer =>
+								name => $pi->title(), width => $viewsize, height => $viewsize,
+								pack => {fill => 'none'}, image => $pic);
+							$::application->yield();
+						}
+					} else {
+						$pr = labelBox($target,$pi->text(),$pi->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+						$pr->set( pack => { anchor => 'n', valignment => ta::Top } );
+						$pr->insert( Button => # which places button for removing...
+							text => "Remove",
+							onClick => sub { $pr->destroy(); return 0; }, );
+					}
+				},
 			) unless ($pi->title() eq "Unnamed");
 			push(@$ar,$pi); # store record
 			$ti = RItem->new( title => $2 ); # start new record, in case there are more items in this file
@@ -307,8 +420,8 @@ sub tryLoadDesc {
 			);
 		}
 	) unless ($ti->title() eq "Unnamed");
-	$resettarget->insert( Button => text => "Pick different file", onClick => sub { refreshDescList($resettarget,$fn,$target,$ar); }, );
-	$stat->push("Done loading $count items.");
+	$resettarget->insert( Button => text => "Pick different file", onClick => sub { refreshDescList($resettarget,$target,$ar); }, );
+	getGUI('status')->push("Done loading $count items.");
 	return 0; # success!
 }
 print ".";
@@ -317,11 +430,11 @@ print ".";
 	Makes a button for each FILE, to load its items into a given TARGET with buttons to copy that item into the PREVIEW and the ARRAYREF. Said items have the option of clearing the PARENT.
 =cut
 sub makeDescButton {
-	my ($lister,$f,$lpane,$preview,$tar) = @_;
+	my ($lister,$f,$lpane,$preview,$tar,$sched) = @_;
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-		my $error = tryLoadDesc($lpane,$f,$preview,$tar);
-		$error && $stat->push("An error occurred loading $f!"); }, height => $buttonheight, );
+		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched);
+		$error && getGUI('status')->push("An error occurred loading $f!"); }, height => $buttonheight, );
 }
 print ".";
 
@@ -336,6 +449,7 @@ Dies on error opening library directory.
 sub resetGrouping {
 	my ($args) = @_;
 	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	my $bgcol = $$args[1];
 	$ordpage->empty(); # start with a blank slate
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	my @files = FIO::dir2arr($odir);
@@ -349,12 +463,13 @@ sub resetGrouping {
 	my $preview = $paner->insert( VBox => name => "preview", pack => {fill => 'both', expand => 1, ipad => 3, anchor => 'n', side => 'top'} );
 	$preview->backColor(PGK::convertColor("#99FF99"));
 	my $rpane = $paner->insert( VBox => name => "Output", pack => {fill => 'y', expand => 0} , backColor => PGK::convertColor("#ccFF99") );
-	my $grouper = $rpane->insert( VBox => name => "grouper", pack => {fill => 'both', expand => 1, ipad => 3} );
+	my $grouper = $rpane->insert( VBox => name => "grouper", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor($bgcol), );
 	my $rowbox;
 	$lister->insert( Label => text => "Choose a description file:");
 	$grouper->insert( Label => text => "Choose a group file:");
-	my $newfile = $grouper->insert( HBox => name => "newbox", );
+	my $newfile = $grouper->insert( HBox => name => "newbox", backColor => PGK::convertColor($bgcol), );
 	my $newil = $newfile->insert( InputLine => text => "unnamed" );
+	my $stat = getGUI("status");
 	$newfile->insert( Button => text => "Create", onClick => sub {
 				my $f = $newil->text;
 				$grouper->destroy();
@@ -362,7 +477,6 @@ sub resetGrouping {
 				$f = "$f.rig"; # add RIG extension
 				my $error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows);
 				$error && $stat->push("An error occurred loading $f!"); });
-	my $stat = getGUI("status");
 	foreach my $f (@files) {
 		if ($f =~ /\.dsc/) { # description files
 			makeDescButton($lister,$f,$lpane,$preview,$tar);
@@ -372,7 +486,49 @@ sub resetGrouping {
 				$error && $stat->push("An error occurred loading $f!"); }, height => $buttonheight, );
 		}
 	}
-	my $op = labelBox($ordpage,"Ordering page not yet coded.",'r','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+	my $op = labelBox($ordpage,"Grouping page not yet coded.",'r','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+}
+print ".";
+
+sub fetchapic { # fetches an image from the cache, or from the server if it's not there.
+	my ($line,$hitserver,$stat,$target) = @_;
+	$line =~ /(https?:\/\/)?([\w-]+\.[\w-]+\.\w+\/|[\w-]+\.\w+\/)(.*\/)*(\w+\.?\w{3})/;
+	my $server = ($2 or "");
+	my $img = ($4 or "");
+	$img =~ s/\?.*//; # we won't want ?download=true or whatever in our filenames.
+	return -1 if ($server eq "" || $img eq ""); # if we couldn't parse this, we won't even continue.
+	my $thumb = (FIO::config('Net','thumbdir') or "itn");
+	my $lfp = $thumb . "/";
+	unless (-e $lfp . $img && -f _ && -r _) {
+		$$hitserver = 1;
+		$stat->push("Trying to fetch $line ($img)");
+#		print("Trying to fetch $line ($img) to $lfp");
+		my $failure = FIO::Webget($line,"$lfp$img");# get image from server here
+		$failure and defined $target and $target->insert( Label => name => "$img", text => "$img could not be retrieved from server $2.");
+	} else {
+		$stat->push("Loading image $img from cache");
+	}
+	return (0,$server,$img,$lfp);
+}
+print ".";
+
+sub showapic {
+	my ($lfp,$img,$viewsize) = @_;
+	my $pic = Prima::Image->new;
+	my $lfn = "$lfp$img";
+	$pic->load($lfn) or die "Could not load $lfn!";
+#	$pic->set(scaling => 7); # ist::Hermite);
+	my $iz = 1;
+	if ($pic->width > $pic->height) {
+		my $w = $pic->width;
+		$iz = $viewsize / $pic->width; # get appropriate scale
+		$pic->size($pic->height * $iz,$viewsize); # resize the image to fit our viewport
+	} else {
+		my $h = $pic->height;
+		my $iz = $viewsize / $pic->height; # get appropriate scale
+		$pic->size($viewsize,$pic->width * $iz); # resize the image to fit our viewport
+	}
+	return ($pic,$iz);
 }
 print ".";
 
@@ -395,7 +551,6 @@ sub tryLoadInput {
 	$resettarget->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, );
 	return 0 unless (Common::findIn($fn,@openfiles) < 0); # don't try to load if already loaded that file.
 	return 0 unless (-e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
-	my $thumb = (FIO::config('Net','thumbdir') or "itn");
 	my $stat = getGUI('status');
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$stat->push("Trying to load $fn...");
@@ -405,52 +560,27 @@ sub tryLoadInput {
 	} elsif ($#them == 1) {
 		$stat->push("One line found in file!");
 	}
-	$outbox = labelBox($resettarget,"Images",'imagebox','V', boxfill => 'both', boxex => 1, labfill => 'none', labex => 0);
+	my $outbox = labelBox($resettarget,"Images",'imagebox','V', boxfill => 'both', boxex => 1, labfill => 'none', labex => 0);
 	my $hb = $outbox->insert( HBox => name => "$fn" ); # Left/right panes
 	my $ib = $hb->insert( VBox => name => "Image Port", pack => {fill => 'y', expand => 1, padx => 3, pady => 3,} ); # Top/bottom pane in left pane
 	my $vp; # = $ib->insert( ImageViewer => name => "i$img", zoom => $iz, pack => {fill => 'none', expand => 1, padx => 1, pady => 1,} ); # Image display box
 	my $cap = $ib->insert( Label => text => "(Nothing Showing)\nTo load an image, click its button in the list.", autoHeight => 1, pack => {fill => 'x', expand => 0, padx => 1, pady => 1,} ); # caption label
 	my $lbox = $hb->insert( VBox => name => "Images", pack => {fill => 'both', expand => 1, padx => 0, pady => 0,} ); # box for image rows
 	foreach my $line (@them) {
-		$line =~ /(https?:\/\/)?([\w-]+\.[\w-]+\.\w+\/|[\w-]+\.\w+\/)(.*\/)*(\w+\.?\w{3})/;
-		my $server = $2 or "";
-		my $img = $4 or "";
+		Pwait(0.1); # even though this slows the process by a tenth of a second, it lets the user see each button appear, which prevents the appearance the program has hung up.
+		my ($error,$server,$img,$lfp) = fetchapic($line,\$hitserver,$stat,$lbox);
+		return $error if $error;
 		my $row = $lbox->insert( HBox => name => $img);
-		return -1 if ($server eq "" || $img eq ""); # if we couldn't parse this, we won't try to build a row, or even continue.
 		$orderkey++; # new order key for each image found.
 		my $okey = sprintf("%04d",$orderkey);# Friendly name, in string format for use as hash key for keeping image order
 		$$hashr{$okey} = {}; # make a new empty hash for each image
 		$$hashr{$okey}{url} = $line; # Store image url for matching with a description later
-		$img =~ s/\?.*//; # we won't want ?download=true or whatever in our filenames.
-		my $lfp = $thumb . "/";
-		unless (-e $lfp . $img && -f _ && -r _) {
-			$hitserver = 1;
-			$stat->push("Trying to fetch $line ($img)");
-#			print("Trying to fetch $line ($img) to $lfp");
-			my $failure = FIO::Webget($line,"$lfp$img");# get image from server here
-			$failure and $row->insert( Label => name => "$img", text => "$img could not be retrieved from server $2.");
-		} else {
-			$stat->push("Loading image $img from cache");
-		}
-		Pwait(0.1); # even though this slows the process by a tenth of a second, it lets the user see each button appear, which prevents the appearance the program has hung up.
 		if (-r $lfp . $img ) {
 # put both of these in a row object, along with the inputline for the description
 			$row->insert( Label => name => "$img", text => "Description for ");
 # replace this with an Image object, so we can set the zom factor and resize the image when the user clicks on it to see it so they can describe it.
-			my $pic = Prima::Image->new;
+			my ($pic,$iz) = showapic($lfp,$img,$viewsize);
 			my $lfn = "$lfp$img";
-			$pic->load($lfn);
-#			$pic->set(scaling => 7); # ist::Hermite);
-			my $iz = 1;
-			if ($pic->width > $pic->height) {
-				my $w = $pic->width;
-				$iz = $viewsize / $pic->width; # get appropriate scale
-				$pic->size($pic->height * $iz,$viewsize); # resize the image to fit our viewport
-			} else {
-				my $h = $pic->height;
-				my $iz = $viewsize / $pic->height; # get appropriate scale
-				$pic->size($viewsize,$pic->width * $iz); # resize the image to fit our viewport
-			}
 			my $shower = $row->insert( Button => name => "$lfn", text => "$img", height => $buttonheight, ); # button for filename
 			$shower->set( onClick => sub {
 				defined $vp and $vp->destroy;
@@ -516,17 +646,19 @@ Dies on error opening given directory.
 sub resetDescribing {
 	my ($args) = @_;
 	my $imgpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	my $bgcol = $$args[1];
 	$imgpage->empty(); # clear page.
 	my @files = FIO::dir2arr("./","txt"); # get list of .txt files
-	my ($listbox, $delaybox, $sizer);
-	$imgpage->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, );
+	my ($listbox, $delaybox, $sizer,%images);
+	$imgpage->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, backColor => PGK::convertColor($bgcol), );
 	my $filebox = labelBox($imgpage,"Seconds between fetches",'filechoice','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
+	$filebox->set(backColor => PGK::convertColor($bgcol));
 #	my $fnb = $filebox->insert( InputLine => name => 'thisfile');
 #	my $dl = $filebox->insert( Label => text => "Seconds between fetches");
 	$delaybox = $filebox->insert( SpinEdit => name => 'cooldown', max => 600, min => 0, step => 5, value => 7);
 	my $sl = $filebox->insert( Label => text => "Size of thumbnails");
 	$sizer = $filebox->insert( SpinEdit => name => 'size', max => 2048, min => 100, step => 50, value => 200);
-	my $lister = $imgpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1} );
+	my $lister = $imgpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1}, backColor => PGK::convertColor($bgcol), );
 	$lister->insert( Label => text => "Choose a file containing URLs:");
 	foreach my $f (@files) {
 		next if $f =~ /^TODO/; # Not the TODO file
@@ -556,7 +688,7 @@ sub populateMainWin {
 	my $pager = $win->insert( Pager => name => 'Pages', pack => { fill => 'both', expand => 1}, );
 	$pager->build(@tabs);
 	my $i = 1;
-	my $color = Common::getColors(5,1,1);
+	my $color = Common::getColors(13,1,1);
 	my $currpage = 0; # placeholder
 
 	# Image tab
@@ -564,7 +696,7 @@ sub populateMainWin {
 		backColor => PGK::convertColor($color),
 		pack => { fill => 'both', },
 	);
-	$pager->setSwitchAction("Describing",\&resetDescribing,$imgpage);
+	$pager->setSwitchAction("Describing",\&resetDescribing,$imgpage,$color);
 
 	# Grouping tab
 	$color = Common::getColors(6,1,1);
@@ -573,7 +705,7 @@ sub populateMainWin {
 		pack => { fill => 'both', },
 	);
 	my $gp = labelBox($grppage,"Grouping page not yet coded.",'g','H', boxfill => 'both', boxex => 1, labfill => 'x', labex => 1);
-	$pager->setSwitchAction("Grouping",\&resetGrouping,$grppage);
+	$pager->setSwitchAction("Grouping",\&resetGrouping,$grppage,$color);
 
 	# Ordering tab
 	$color = Common::getColors(10,1,1);
@@ -582,23 +714,63 @@ sub populateMainWin {
 		pack => { fill => 'both', },
 	);
 	my $op = labelBox($ordpage,"Ordering page not yet coded.",'o','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
-	$pager->setSwitchAction("Ordering",\&resetOrdering,$ordpage); # reload the description buttons whenever we switch to this page, in case the user made a new dsc file on the Describing tab.
+	$op->set(backColor => PGK::convertColor($color));
+	$pager->setSwitchAction("Ordering",\&resetOrdering,$ordpage,$color); # refresh this page whenever we switch to it
 
 	# Publishing tab
-	$color = Common::getColors(9,1,1);
+	$color = Common::getColors(8,1,1);
 	my $pubpage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
 	);
+	$pager->setSwitchAction("Publishing",\&resetPublishing,$pubpage,$color); # refresh this page whenever we switch to it
+
 	my $pp = labelBox($pubpage,"Publishing page not yet coded.",'r','H', boxfill => 'both', boxex => 1, labfill => 'x', labex => 1);
+	$pp->set(backColor => PGK::convertColor($color));
+	$color = Common::getColors(18,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 18", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(2,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 2", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(19,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 19", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(20,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 20", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(5,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 5", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(6,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 6", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(7,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 7", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(8,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 8", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(9,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 9", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(10,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 10", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(21,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 21", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(12,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 12", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(13,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 13", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(14,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 14", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(22,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 22", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(23,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 23", backColor => ColorRow::stringToColor($color));
+	$color = Common::getColors(24,1,1);
+	$pubpage->insert( Label => text => "Now is the time for all good men... 24", backColor => ColorRow::stringToColor($color));
 
 	# Scheduling tab
-	$color = Common::getColors(8,1,1);
+	$color = Common::getColors(7,1,1);
 	my $schpage = $pager->insert_to_page($currpage++,VBox =>
 		backColor => ColorRow::stringToColor($color),
 		pack => { fill => 'both', },
 	);
+	$pager->setSwitchAction("Scheduling",\&resetScheduling,$schpage,$color); # refresh this page whenever we switch to it
 	my $sp = labelBox($schpage,"Scheduling page not yet coded.",'r','H', boxfill => 'x', boxex => 1, labfill => 'x', labex => 1);
+	$sp->set(backColor => PGK::convertColor($color));
 	$color = Common::getColors(($i++ % 2 ? 0 : 7),1);
 
 	$pager->switchToPanel("Describing");
@@ -618,6 +790,8 @@ sub buildMenus { #Replaces Gtk2::Menu, Gtk2::MenuBar, Gtk2::MenuItem
 	my $gui = shift;
 	my $menus = [
 		[ '~File' => [
+			['~Preferences', sub { return callOptBox($gui); }],
+			[],
 			['Close', 'Ctrl-W', km::Ctrl | ord('W'), sub { $$gui{mainWin}->close() } ],
 		]],
 		[ '~Help' => [

@@ -59,6 +59,8 @@ sub expandMe {
 	$text =~ s/%weekday%/$dstr/;
 	my $gogue = FIO::config('Main','orgname') or "Missing Name";
 	$text =~ s/%name%/$gogue/;
+# if $text =~ m/%group=/ ... run group parser ### TODO ###
+	$text=~ s/#x26;//g; # the XML output parser is going to expand the ampersand even if a valid entity follows it. *facepalm*
 	return $text;
 }
 print ".";
@@ -125,7 +127,7 @@ sub getOpts {
 		'042' => ['n',"How many rows per column in file lists?",'filerows',10,3,30,1,5],
 
 		'100' => ['l',"Network",'Net'],
-		'101' => ['c',"Save bandwidth by saving iamge thumbnails",'savethumbs'],
+		'101' => ['c',"Save bandwidth by saving image thumbnails",'savethumbs'],
 		'102' => ['t',"Thumbnail Directory",'thumbdir'],
 		'103' => ['n',"File argument Style",'wierdRL'], # 0 = xxx.png, 1 = xxx.png?dl=1, 2 = view?asset=xxxx, 3 = view.png?asset=xxxx
 

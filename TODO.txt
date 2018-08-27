@@ -4,3 +4,6 @@ Run through each date from the first to the last (inclusive)
 For each date, determine the day of the week and the week of the month.
 Run day.txt and daywknum.txt and dayodd/dayeven.txt.
 Publish RSS file.
+
+Fix error where last day is not processed.
+Fix error that results in failure to delete some old items.
