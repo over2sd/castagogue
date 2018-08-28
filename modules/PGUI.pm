@@ -51,7 +51,7 @@ sub resetScheduling {
 	my $stage = $panes->insert( VBox => name => "stager", pack => { fill => 'both' }, );
 	my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
 	my $tb = labelBox($stage,"Content: ",'H', boxfill => 'x', boxex => 1, labfill => 'x', labex => 1, );
-	my $tbi = $tb->insert( Edit => text => "This is a wonderful place to put the final description text.", pack => { fill => 'both' }, );
+	my $tbi = $tb->insert( Edit => text => "This is a wonderful place to put the final description text.", pack => { fill => 'both' }, width => 400, height => 80, );
 	refreshDescList($lister,$prev,$tar,$sched);
 
 	my $op = labelBox($schpage,"Ordering page not yet coded.",'r','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 1);
@@ -107,6 +107,54 @@ sub resetPublishing {
 }
 print ".";
 
+sub tryLoadGroup {
+	my ($target,$fn,$sel,$cols) = @_;
+	my %items;
+	my $key;
+	my @roworder;
+	my $line = 0;
+	my $odir = (FIO::config('Disk','rotatedir') or "lib");
+	$fn = "$odir/$fn";
+	foreach my $l (FIO::readFile($fn,getGUI('status'))) {
+		$line++;
+		if ($l =~ m/row=(.+)/) {
+			print "Row $1\n";
+			$key = $1;
+			push(@roworder,$key);
+			$items{$key} = [];
+		} elsif ($l =~ m/item=(.+)/) {
+			print "Item $1\n";
+			push(@{$items{$key}},RItem->new(title => $1));
+		} elsif ($l =~ m/image=(.+)/) {
+			my $list = ($items{$key} or []);
+			$$list[$#$list]->link($1) if (ref $$list[$#$list] eq "RItem");
+			warn "\n[W] Image outside of item at line $line of $fn! " unless (ref $$list[$#$list] eq "RItem");
+		} elsif ($l =~ m/desc=(.+)/) {
+			my $list = ($items{$key} or []);
+			$$list[$#$list]->text($1) if (ref $$list[$#$list] eq "RItem");
+			warn "\n[W] Description outside of item at line $line of $fn! " unless (ref $$list[$#$list] eq "RItem");
+		}
+	}
+	foreach my $k (keys %items) {
+		delete $items{$k} unless (exists $items{$k} && scalar @{$items{$k}});
+	}
+	my $rows = scalar keys %items;
+	$target->insert( Label => text => "$rows rows loaded from $fn." );
+	$sel = $target->insert( VBox => name => "buttonbox" );
+	my $buttonscale = (FIO::config('UI','buts') or 15);
+	my $i = 0;
+	foreach my $k (@roworder) {
+		next unless (exists $items{$k}); # empty row deleted, skip it.
+		my $row = $sel->insert( HBox => name => "row $k", pack => { fill => 'x', }, );
+		foreach my $c (@{$items{$k}}) {
+			$c->widget($row->insert( Button => width => $buttonscale, height => $buttonscale, text => "", hint => $c->text() . " (" . $c->link() . ")", ));
+			$c->widget()->set( backColor => PGK::convertColor("#FFF"), );
+		}
+	}
+	return \%items;
+}
+print ".";
+	
 =item resetOrdering TARGET
 
 Given a TARGET widget, generates the list widgets needed to perform the Ordering page's functions.
@@ -123,19 +171,25 @@ sub resetOrdering {
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	opendir(DIR,$odir) or die $!;
 	my @files = grep {
-		/\.rig$/ # only show rotational image group files.
+		/\.grp$/ # only show rotational image group files.
 		&& -f "$odir/$_"
 		} readdir(DIR);
 	closedir(DIR);
 	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1}, backColor => PGK::convertColor($bgcol),  );
 	$lister->insert( Label => text => "Choose a file containing URLs:");
+	my ($selector,$rows);
+	my $colors = FIO::config('UI','gradient');
 	foreach my $f (@files) {
 		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-#			tryLoadGroup($ordpage,$f);
+			$rows = tryLoadGroup($ordpage,$f,$selector,$colors);
 		});
 	}
 	$ordpage->insert( Label => text => "Ordering", pack => { fill => 'x', expand => 0}, );
-	my $lpane = $ordpage->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol),  );
+	my $bgcol2 = Common::getColors(5,1,1);
+	my $op2 = $ordpage->insert( HBox => name => "Color List");
+	my $sides = $ordpage->insert( HBox => name => "panes");
+	my $lpane = $sides->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol),  );
+	my $rpane = $sides->insert( VBox => name => "Output", pack => {fill => 'both', expand => 0}, backColor => PGK::convertColor($bgcol2), );
 # Group will have:
 	my $gtype = $lpane->insert( XButtons => name => "group type"); # an XButton set to select ordering
 	$gtype->arrange("left"); # horizontal
@@ -146,7 +200,12 @@ sub resetOrdering {
 	my $randbut = $lpane->insert( Button => text => "Produce Order", onClick => sub { 	devHelp(getGUI('mainWin'),"Generating an order"); },); # a randomize button to generate a new sequence.
 	my $sequencer = $lpane->insert( InputLine => name => 'seq', text => '', ); # an InputLine to hold the sequencing.
 	my $saver = $lpane->insert( Button => text => "Save", onClick => sub { devHelp(getGUI('mainWin'),"Saving a sequence"); }, ); # a button to save group into a group file.
-	my $op = labelBox($ordpage,"Ordering page not yet coded.",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+	my $op = labelBox($rpane,"Ordering page not yet coded.",'r','H', boxfill => 'y', boxex => 0, labfill => 'x', labex => 1);
+	$op2->insert( Label => text => "Gradient Order:" );
+	my @colora = split(",",$colors);
+	foreach my $i (0..20) {
+		$op2->insert( Button => text => "", width => 9, height => 9, backColor => PGK::convertColor($colora[$i % ($#colora + 1)]));
+	}
 }
 print ".";
 
@@ -156,20 +215,23 @@ print ".";
 =cut
 
 sub itemIntoRow {
-	my ($rows,$index,$iname,$link,$desc) = @_;
+	my ($rows,$index,$iname,$link,$desc,$extra) = @_;
 	$index = ($index == -1 ? $#$rows : $index); # -1 means last row
 	my $rowob = $$rows[$index] or die "No row object found in rows array!";
-	my $ti = $rowob->insert( HBox => backColor => PGK::convertColor(Common::getColors(($index % 2 ? 5 : 6),1)), );
+	my $ti = $rowob->insert( HBox => backColor => PGK::convertColor(Common::getColors(($index % 2 ? 5 : 6),1,1)), );
 	$ti->insert( InputLine => text => Common::shorten("$desc",15,3), pack => { fill => 'none', expand => 0, }  );
 	$ti->{inm} = $iname;
 	$ti->{link} = $link;
 	$ti->{desc} = $desc;
+	$ti->{cat} = $extra->{cat} if (defined $extra->{cat});
+	$ti->{time} = $extra->timestamp() if (ref $extra eq "RItem");
 	PGK::killButton($ti, sub { $ti->destroy(); }); #delete row from page
 }
 print ".";
 
 sub slurpPane {
 	my ($prev,$target,$rows,$index,$items) = @_;
+	return unless (ref $prev eq "VBox");
 	my @rows = $prev->get_widgets(); # prev is expected to be a VBox. Grab its children.
 	foreach my $r (@rows) {
 		print "The name is " . $r->name() . "..."; # the row's name will match the item's name...
@@ -198,7 +260,49 @@ sub slurpButton {
 print ".";
 
 sub trySaveGroup {
-	devHelp(getGUI('mainWin'),"Saving groups");
+	my ($target,$rows,$fnwidget,$args) = @_;
+	my @lines;
+	push(@lines,"next=-1,-1");
+	my $fn = $fnwidget->text();
+	$target->insert( Label => text => "Preparing to save file...");
+	print "\n[I] I'll be saving group info into '$fn'";
+	my $i = 0;
+	foreach my $r (@$rows) {
+		print "Row $i: ";
+		foreach my $c ($r->widgets()) {
+			for (ref $c) {
+				if (/InputLine/) { print $c->text() . "\n";
+					push(@lines,"row=" . $c->text());
+				}elsif (/HBox/) {
+					unless (defined $c->{inm}) {
+						print "\n [W] Skipping box with missing item number: $c\n";
+						next
+					} else {
+						push(@lines,"item=" . $c->{inm}) if (defined $c->{inm});
+						push(@lines,"image=" . $c->{link}) if (defined $c->{link});
+						push(@lines,"desc=" . $c->{desc}) if (defined $c->{desc});
+						push(@lines,"cat=" . $c->{cat}) if (defined $c->{cat});
+						push(@lines,"time=" . $c->{time}) if (defined $c->{time});
+						$c->destroy();
+					}
+				} else {
+					$c->destroy();
+				}
+			}
+		}
+		$r->destroy();
+		Pfresh();
+		$i++;
+	}
+	print $target->name();
+	$target->empty();
+	$target->insert( Label => text => "Saving your file as\n$fn...", autoHeight => 1 );
+	Pfresh(); # redraw UI
+	my $error = FIO::writeLines($fn,\@lines,1); # overwrites file!
+	$target->insert( Label => text => "Save complete.\nWrote " . scalar @lines . " lines.", autoHeight => 1);
+	$target->insert( Button => text => "Load/Create\nAnother", onClick => sub { $target->empty(); insertGroupLoaders($target,$$args{prev},$$args{tar},$rows,$$args{bgcol},$$args{buth}); });
+	$target->insert( Button => text => "Continue to\nOrdering tab", onClick => sub { getGUI('pager')->switchToPanel("Ordering"); } );
+	return $error;
 }
 print ".";
 
@@ -209,7 +313,7 @@ Given a reset TARGET widget, a FILE name, a HASHREF of storable values, and a HA
 =cut
 #$rpane,$f,$preview,$tar,$rows);
 sub tryLoadGrouper {
-	my ($target,$fn,$prev,$items,$rows,$debug) = @_;
+	my ($target,$fn,$prev,$items,$rows,$args) = @_;
 	my $orderkey = 0; # keep URLs in order
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn = "$odir/$fn";
@@ -220,7 +324,9 @@ sub tryLoadGrouper {
 	}
 	my $stat = getGUI('status');
 	$stat->push("Trying to read $fn...");
-	my @them = FIO::readFile($fn,$stat);
+	my $size = -s $fn;
+	my $create = (defined $$args{create} ? $$args{create} : 0);
+	my @them = FIO::readFile($fn,$stat,$create);
 	if ($#them == 0) {
 		$stat->push("Zero lines found in file!");
 	} elsif ($#them == 1) {
@@ -232,9 +338,12 @@ sub tryLoadGrouper {
 	my $foundrow = 0;
 # rowbox (( rownameinput rowkillbutton items [[ VBoxes moved over from preview? ]] ))
 
-	$target->insert( Button => text => "Add", onClick => sub {
+	$fn =~ s/\..+$//; # remove any existing extension
+	my $filebox = $target->insert( InputLine => text => "$fn.grp" );
+	my $saver = $target->insert( Button => text => "Save");
+	my $adder = $target->insert( Button => text => "Add Row", onClick => sub {
 		my $row = $target->insert( VBox => name => "rownew", backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
-		$row->insert( InputLine => text => "Unnamed ($foundrow)", );
+		$row->insert( InputLine => text => "Unnamed Row ($foundrow)", );
 		my $kill = $foundrow; # maintain scope for kill button
 		slurpButton($row,$prev,$rows,$kill,$items,undef,'x');
 		PGK::killButton($row, sub { splice(@$rows,$kill,1); $row->destroy(); },undef,'x'); #delete row from page and from array
@@ -285,7 +394,7 @@ sub tryLoadGrouper {
 			}
 			itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
 			($link,$desc,$itemname) = (undef,undef,undef); # clear values so I can check for definition
-			(defined $debug) and print ":";
+			(defined $$args{debug}) and print ":";
 			$count++;
 			$descact = 0;
 			$itemname = $2;
@@ -294,13 +403,14 @@ sub tryLoadGrouper {
 		} else { # Oops! Error.
 			warn "\n[W] I found unexpected keyword $k with value $2 in $fn" . Common::lineNo();
 		}
-#defined $debug and print "\n $k = $2...";
+#defined $$args{debug} and print "\n $k = $2...";
 	}
 	itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
 	$prev->empty();
 	$fn =~ s/\..+$//; # remove any extension
-	my $filebox = $target->insert( InputLine => text => "$fn.grp" );
-	$target->insert( Button => text => "Save", onClick => sub { trySaveGroup($target,$rows,$filebox) } );
+	$$args{prev} = $prev;
+	$$args{tar} = $items;
+	$saver->set( onClick => sub { $adder->destroy(); $saver->destroy(); $filebox->hide(); trySaveGroup($target,$rows,$filebox,$args) } );
 	$stat->push("Done loading $count items.");
 	return 0; # success!
 
@@ -350,7 +460,6 @@ sub tryLoadDesc {
 	my $count = 0;
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$stat->push("Processing " . scalar @them . " lines...");
-	print "RT: " . $resettarget->name . "...";
 	my $ti = RItem->new();
 	foreach my $line (@them) {
 		chomp $line;
@@ -392,7 +501,7 @@ sub tryLoadDesc {
 							$pr->insert( ImageViewer =>
 								name => $pi->title(), width => $viewsize, height => $viewsize,
 								pack => {fill => 'none'}, image => $pic);
-							$::application->yield();
+							Pfresh();
 						}
 					} else {
 						$pr = labelBox($target,$pi->text(),$pi->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
@@ -463,9 +572,22 @@ sub resetGrouping {
 	my $preview = $paner->insert( VBox => name => "preview", pack => {fill => 'both', expand => 1, ipad => 3, anchor => 'n', side => 'top'} );
 	$preview->backColor(PGK::convertColor("#99FF99"));
 	my $rpane = $paner->insert( VBox => name => "Output", pack => {fill => 'y', expand => 0} , backColor => PGK::convertColor("#ccFF99") );
+	$lister->insert( Label => text => "Choose a description file:");
+	foreach my $f (@files) {
+		if ($f =~ /\.dsc/) { # description files
+			makeDescButton($lister,$f,$lpane,$preview,$tar);
+		}
+	}
+	my $error = insertGroupLoaders($rpane,$preview,$tar,$rows,$bgcol,$buttonheight);
+	my $op = labelBox($ordpage,"Grouping page not yet coded.",'r','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+}
+print ".";
+
+sub insertGroupLoaders { # we'll be doing this (placing buttons for loading/creating a GRP file) from two places.
+	my ($rpane,$preview,$tar,$rows,$bgcol,$buttonheight) = @_;
+	my $error = 0;
 	my $grouper = $rpane->insert( VBox => name => "grouper", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor($bgcol), );
 	my $rowbox;
-	$lister->insert( Label => text => "Choose a description file:");
 	$grouper->insert( Label => text => "Choose a group file:");
 	my $newfile = $grouper->insert( HBox => name => "newbox", backColor => PGK::convertColor($bgcol), );
 	my $newil = $newfile->insert( InputLine => text => "unnamed" );
@@ -474,19 +596,20 @@ sub resetGrouping {
 				my $f = $newil->text;
 				$grouper->destroy();
 				$f =~ s/\..+$//; # remove any existing extension
-				$f = "$f.rig"; # add RIG extension
-				my $error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows);
-				$error && $stat->push("An error occurred loading $f!"); });
+				$f = "$f.grp"; # add GRP extension
+				$error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows,{bgcol => $bgcol,create => 1,buth => $buttonheight,});
+				$error and $stat->push("An error occurred loading $f!"); });
+	$error and return $error;
+	my $odir = (FIO::config('Disk','rotatedir') or "lib");
+	my @files = FIO::dir2arr($odir);
 	foreach my $f (@files) {
-		if ($f =~ /\.dsc/) { # description files
-			makeDescButton($lister,$f,$lpane,$preview,$tar);
-		} elsif ($f =~ /\.rig/) { # rotating image groups
+		if ($f =~ /\.grp/) { # rotating image groups
 			$grouper->insert( Button => text => $f, onClick => sub { $grouper->destroy();
-				my $error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows);
-				$error && $stat->push("An error occurred loading $f!"); }, height => $buttonheight, );
+				$error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows,{bgcol => $bgcol, buth => $buttonheight,});
+				$error and $stat->push("An error occurred loading $f!"); }, height => $buttonheight, );
 		}
 	}
-	my $op = labelBox($ordpage,"Grouping page not yet coded.",'r','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+	return $error;
 }
 print ".";
 
@@ -547,7 +670,7 @@ sub tryLoadInput {
 	my $orderkey = 0; # keep URLs in order
 	$viewsize = $viewsize->value; # object to int
 	$resettarget->empty(); # clear page.
-	Pwait(0.1); # even though this slows the process by a tenth of a second, it lets the user see progress, which makes it feel less like a long wait.
+	Pfresh(); # redraw UI
 	$resettarget->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, );
 	return 0 unless (Common::findIn($fn,@openfiles) < 0); # don't try to load if already loaded that file.
 	return 0 unless (-e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
@@ -567,7 +690,7 @@ sub tryLoadInput {
 	my $cap = $ib->insert( Label => text => "(Nothing Showing)\nTo load an image, click its button in the list.", autoHeight => 1, pack => {fill => 'x', expand => 0, padx => 1, pady => 1,} ); # caption label
 	my $lbox = $hb->insert( VBox => name => "Images", pack => {fill => 'both', expand => 1, padx => 0, pady => 0,} ); # box for image rows
 	foreach my $line (@them) {
-		Pwait(0.1); # even though this slows the process by a tenth of a second, it lets the user see each button appear, which prevents the appearance the program has hung up.
+		Pfresh();
 		my ($error,$server,$img,$lfp) = fetchapic($line,\$hitserver,$stat,$lbox);
 		return $error if $error;
 		my $row = $lbox->insert( HBox => name => $img);

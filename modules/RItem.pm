@@ -20,6 +20,7 @@ sub new {
 		cat => ($profile{cat} or "general"),
 		time => ($profile{time} or "1200"),
 		date => ($profile{date} or "Mon, 01 Jan 2018"),
+		gob => ($profile{guiobject} or undef),
 	};
 	bless $self, $class;
 	return $self;
@@ -89,10 +90,16 @@ sub date {
 
 sub timestamp { # just a getter
 	my $self = shift;
-		$self->time =~ /(\d\d)(\d\d)/;
-		(!defined $1 || !defined $2) && die "RItem found to have an improper time value (expected #### and got $self->time).";
-		my $time = $self->date . " $1:$2:00 " . Sui::getTZ();
-		return $time;
+	$self->time =~ /(\d\d)(\d\d)/;
+	(!defined $1 || !defined $2) && die "RItem found to have an improper time value (expected #### and got $self->time).";
+	my $time = $self->date . " $1:$2:00 " . Sui::getTZ();
+	return $time;
+}
+
+sub widget {
+	my ($self,$set) = @_;
+	defined $set or return $self->get('gob');
+	return $self->set('gob',$set);
 }
 
 print ".";

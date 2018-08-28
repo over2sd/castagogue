@@ -9,7 +9,7 @@ use utf8;
 ####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
 
 my $PROGRAMNAME = "Castapic";
-my $version = "0.007a";
+my $version = "0.008a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGRAMNAME v$version is running.";
@@ -50,6 +50,7 @@ my $gui = PGK::createMainWin($PROGRAMNAME,$version,800,500);
 my $text = $$gui{status};
 PGUI::populateMainWin(undef,$gui,0);
 $text->push("Ready.");
+Options::formatTooltips();
 Prima->run();
 
 1;

@@ -134,11 +134,12 @@ print ".";
 
 sub readFile {
 	my $fh;
-	my ($fn,$stat) = @_;
+	my ($fn,$stat,$create) = @_;
+	$create and return ();
 	unless (open($fh,"<$fn")) { # open file
-		$stat and $stat->push("\n[E] Error opening file: $!" );
+		$stat and $stat->push("\n[E] Error opening file '$fn': $!" );
 		config('Main','fatalerr') && die "I am slain by unopenable file $fn because $!";
-		return [];
+		return ();
 	} else {
 		$stat and $stat->push("Loaded $fn...");
 		chomp (my @lines = <$fh>);
@@ -205,7 +206,7 @@ sub dir2arr {
 		@files = grep { -f "$odir/$_" } readdir(DIR); # show all files.
 	}
 	closedir(DIR);
-print scalar @files . " files found.";
+#print scalar @files . " files found.";
 	return @files; # return array of file names.
 }
 print ".";

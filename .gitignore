@@ -3,7 +3,7 @@
 *.pnps
 
 # data:
-schedule/*day.txt
+schedule/*.txt
 schedule/20*-*-*.txt
 itn/
 lib/

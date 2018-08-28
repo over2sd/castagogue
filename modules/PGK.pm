@@ -5,7 +5,7 @@ print __PACKAGE__;
 
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox Pdie Pwait Pager );
+@EXPORT = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox Pdie Pwait Pager Pfresh );
 use Prima qw(Application Buttons MsgBox FrameSet);
 
 use FIO qw( config );
@@ -1132,7 +1132,7 @@ sub Pwait {
 	my $start = time();
 	my $end = ($start+$duration);
 	while ($end > time()) {
-		$::application->yield();
+		Pfresh();
 		# 10ms sleep.
 		# Not much, but prevents processor spin without making waiting dialogs unresponsive.
 		select(undef,undef,undef,0.01);
@@ -1140,6 +1140,10 @@ sub Pwait {
 	return 0;
 }
 print ".";
+
+sub Pfresh { # shorthand for Prima's yield, which essentially causes (allows) the GUI to redraw/refresh.
+	$::application->yield();
+}
 
 =item applyFont TYPE WIDGET
 

@@ -125,6 +125,7 @@ sub getOpts {
 		'040' => ['c',"Show a horizontal rule between rows",'rulesep'],
 		'041' => ['x',"Rule color: ",'rulecolor',"#003"],
 		'042' => ['n',"How many rows per column in file lists?",'filerows',10,3,30,1,5],
+		'043' => ['t',"Color codes for gradient (comma separated)",'gradient'],
 
 		'100' => ['l',"Network",'Net'],
 		'101' => ['c',"Save bandwidth by saving image thumbnails",'savethumbs'],
@@ -176,6 +177,7 @@ sub getDefaults {
 		['Main','tz',-6],
 		['Net','savethumbs',1],
 		['Net','thumbdir',"itn"],
+		['UI','gradient',"#F00,#FF7F00,#FF0,#0F0,#00F,#4B0082,#9400D3,#001,#012,#123,#234,#345,#456,#567,#678,#789,#89A,#9AB,#ABC,#BCD,#CDE,#DEF"],
 	);
 }
 print ".";
