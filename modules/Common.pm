@@ -1,18 +1,20 @@
 package Common;
 print __PACKAGE__;
 
+use strict;
 use Exporter qw(import);
 our @EXPORT = qw( infMes getColorsbyName missing );
 
+my $debug = main::howVerbose();
 my @obj = @{ Sui::passData('objectionablecontent') };
 my %objindex;
-@objindex{@obj} = (0..$#obj);
+$objindex{@obj} = (0..$#obj);
 # used by contentMask and by contentList
 sub contentMask {
 	my ($key,$mask) = @_;
 	# get position, or position just outside the array
 	# (won't bother getBit, but beware using this return value elsewhere!)
-	my $pos = get(\$objindex,$key,scalar @obj);
+	my $pos = get(\%objindex,$key,scalar @obj);
 	unless (defined $mask) { return $pos; }
 	return getBit($pos,$mask); # if passed a mask, return true/false that that key's bit is set in the mask.
 }
@@ -173,7 +175,7 @@ print ".";
 
 sub findIn {
 	my ($v,@a) = @_;
-	if ($debug > 0) {
+	if (defined $debug && $debug > 0) {
 		use Data::Dumper;
 		print ">>".Dumper @a;
 		print "($v)<<";
@@ -297,7 +299,7 @@ sub getAge {
 	$maxdays[2] = 29 if (($1%400 == 0) || ($1%4 == 0 && $1%100 != 0));
 	return undef if (int($2) > 12 or $3 > $maxdays[int($2)]); # Prevents a segfault if date sent is out of bounds, like 9999-99-99
 	my $start = DateTime->new( year => $1, month => $2, day => $3);
-	$start->add( days => 1 ) if $leapday;
+#	$start->add( days => 1 ) if $leapday;
 	my $end = DateTime->now;
 	my $age = $end - $start;
 	return $age->in_units('years');
@@ -525,6 +527,176 @@ sub listMerge {
 	}
 	return \@oa,\@oi;
 }
+
+sub listUnsort { # Fisher-Yates shuffle
+my $limit = 0;
+	my $ar = shift;
+	my $i = @$ar; #start at end
+	while (--$i) { # moving pointer backward
+		my $j = int(rand($i+1)); # pick a random number between pointer and start
+		@$ar[$i,$j] = @$ar[$j,$i]; # swap these two
+return if ($limit++ > 200);
+	}
+	return 0; # success
+}
+print ".";
+
+sub sequenceAoA {
+	my ($aoa,$styp,$seed,$missing) = @_;
+	$seed or ($seed = (time() + scalar @$aoa % int $styp));
+	srand($seed) unless ($seed < 0); # option to set seed.
+	my @newa = ();
+	my @widths = ();
+	my $widest = -1;
+	my $rows = @$aoa;
+	my $limit = 0;
+	foreach my $k (0..$#$aoa) {
+		push(@widths,scalar @{$$aoa[$k]});
+		$widest = ($widest > $widths[$#widths] ? $widest : $widths[$#widths]);
+	}
+	my @roworder = (0..$#$aoa);
+	listUnsort(\@roworder); # shuffle rows
+	for ($styp) { # 0 is under 4.
+		if (/1/ ) { # striped = 1-3,2-3,3-3,1-1,2-1,3-1,1-2,2-2,3-2... random column, carried through each row
+			my @columns = (0..$widest-1);
+			listUnsort(\@columns); # shuffle columns
+			foreach my $c (@columns) { # for each random column
+				foreach my $r (0..$#$aoa) { # for each row in order
+					next if ($c >= $widths[$r] && not defined $missing); # skip if row not wide enough
+					$c = (int($missing) == 0 ? $widths[$r] : $c % $widths[$r] - 1) if ($c >= $widths[$r]); # allow user to select 0: last available or nonzero: modulo of given column
+					push(@newa,$$aoa[$r][$c]); # copy item from this row/column
+				}
+			}
+		} elsif (/2/ ) { # grouped = 2-1,2-3,2-2,3-2,3-1,3-3,1-2,1-1,1-3... random rows, random column in each row
+			foreach my $r (@roworder) { # in each row...
+				my @columns = (0..$widths[$r]-1); # get column numbers...
+				listUnsort(\@columns); # shuffle column numbers...
+				foreach my $c (@columns) { # take each selected column...
+					push(@newa,$$aoa[$r][$c]); # copy item from this row/column
+				}
+			}
+		} elsif (/3/ ) { # mixed = 2-3,3-1,1-2,3-3,2-1,1-1,3-2,2-2... random order, but a different row each item
+			my @columns = ();
+			foreach my $r (0..$#$aoa) { # for each row
+				my @row = (0..$widths[$r]-1); # get this row's indices
+				listUnsort(\@row); # shuffle this row
+				push(@columns,\@row); # add row to row record
+			}
+			my $total = 0;
+			foreach my $r (0..$#widths) {
+				$total += $widths[$r];
+			}
+			while ($total > 0) {
+				foreach my $r (@roworder) {
+					my $c = $columns[$r];
+					if (scalar @$c) {
+						my $i = shift @$c;
+						$total--; $widths[$r]--;
+#						print "\n$r-$i ";
+						push(@newa,$$aoa[$r][$i]);
+					}
+				}
+				listUnsort(\@roworder); # shuffle rows
+			}
+			foreach my $r (@roworder) { # clean up last few items that might be left: (shouldn't happen now)
+				my $c = $columns[$r];
+				if (scalar @$c) {
+					my $i = shift @$c;
+					$widths[$r]--;
+					print "\n$r-$i\n";
+					push(@newa,$$aoa[$r][$i]);
+				}
+			}
+		} elsif (/[04]/ ) { # none,sequenced
+			foreach my $r (@$aoa) { # sequenced = 1-1,1-2,1-3,2-1,2-2,2-3,3-1,3-2,3-3... each column of each row in original order
+				foreach my $c (@$r) {
+					push(@newa,$c);
+				}
+			}
+			listUnsort(\@newa) if ($styp == 0); # none = 2-1,3-2,3-3,2-2,2-3,1-3,3-1,1-1,2-1,1-2... completely random order
+		}
+	}
+	return @newa;
+}
+print ".";
+
+sub sequenceHoA {
+	my ($hoa,$styp,$aok,$seed) = @_;
+	$seed or ($seed = (time() + scalar $hoa % int $styp));
+	srand($seed) unless ($seed < 0); # option to set seed.
+	my @newa = ();
+	my @widths = ();
+	my $widest = -1;
+	my $rows = @$aok;
+	my $limit = 0;
+	foreach my $k (@$aok) {
+		push(@widths,scalar @{$$hoa{$k}});
+		$widest = ($widest > $widths[$#widths] ? $widest : $widths[$#widths]);
+	}
+	my @roworder = (0..$#$aok);
+	listUnsort(\@roworder); # shuffle rows
+	for ($styp) { # 0 is under 4.
+		if (/1/ ) { # striped = 1-3,2-3,3-3,1-1,2-1,3-1,1-2,2-2,3-2... random column, carried through each row
+			my @columns = (0..$widest-1);
+			listUnsort(\@columns); # shuffle columns
+			foreach my $c (@columns) { # for each random column
+				foreach my $r (0..$#$aok) { # for each row in order
+					next if ($c >= $widths[$r]); # skip if row not wide enough
+					push(@newa,$$hoa{$$aok[$r]}[$c]); # copy item from this row/column
+				}
+			}
+		} elsif (/2/ ) { # grouped = 2-1,2-3,2-2,3-2,3-1,3-3,1-2,1-1,1-3... random rows, random column in each row
+			foreach my $r (@roworder) { # in each row...
+				my @columns = (0..$widths[$r]-1); # get column numbers...
+				listUnsort(\@columns); # shuffle column numbers...
+				foreach my $c (@columns) { # take each selected column...
+					push(@newa,$$hoa{$$aok[$r]}[$c]); # copy item from this row/column
+				}
+			}
+		} elsif (/3/ ) { # mixed = 2-3,3-1,1-2,3-3,2-1,1-1,3-2,2-2... random order, but a different row each item
+			my @columns = ();
+			foreach my $r (0..$#$aok) { # for each row
+				my @row = (0..$widths[$r]-1); # get this row's indices
+				listUnsort(\@row); # shuffle this row
+				push(@columns,\@row); # add row to row record
+			}
+			my $total = 0;
+			foreach my $r (0..$#widths) {
+				$total += $widths[$r];
+			}
+			while ($total > 0) {
+				foreach my $r (@roworder) {
+					my $c = $columns[$r];
+					if (scalar @$c) {
+						my $i = shift @$c;
+						$total--; $widths[$r]--;
+#						print "\n$r-$i ";
+						push(@newa,$$hoa{$$aok[$r]}[$i]);
+					}
+				}
+				listUnsort(\@roworder); # shuffle rows
+			}
+			foreach my $r (@roworder) { # clean up last few items that might be left: (shouldn't happen now)
+				my $c = $columns[$r];
+				if (scalar @$c) {
+					my $i = shift @$c;
+					$widths[$r]--;
+					print "\n$r-$i\n";
+					push(@newa,$$hoa{$$aok[$r]}[$i]);
+				}
+			}
+		} elsif (/[04]/ ) { # none,sequenced
+			foreach my $r (@$aok) { # sequenced = 1-1,1-2,1-3,2-1,2-2,2-3,3-1,3-2,3-3... each column of each row in original order
+				foreach my $c (@{$$hoa{$r}}) {
+					push(@newa,$c);
+				}
+			}
+			listUnsort(\@newa) if ($styp == 0); # none = 2-1,3-2,3-3,2-2,2-3,1-3,3-1,1-1,2-1,1-2... completely random order
+		}
+	}
+	return @newa;
+}
+print ".";
 
 sub lineNo {
 	my $depth = shift;

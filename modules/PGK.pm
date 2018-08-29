@@ -1429,14 +1429,16 @@ print ".";
 
 =item sayBox PARENT TEXT
 
-Makes a dialog box with a message of TEXT and an owner of PARENT.
+Given a PARENT window and a TEXT to display, generates a simple message box to show the text to the user.
 GUI equivalent to 'print TEXT;'.
-No return value.
+Returns 0.
 
 =cut
+
 sub sayBox {
 	my ($parent,$text) = @_;
-	message($text,owner=>$parent);
+	Prima::MsgBox::message($text,owner=>$parent);
+	return 0;
 }
 print ".";
 

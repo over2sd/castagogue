@@ -10,6 +10,7 @@ use PGK;
 use Prima qw( ImageViewer Sliders );
 use Common qw( missing );
 use Options;
+use RRGroup;
 use RItem;
 use strict;
 use warnings;
@@ -107,54 +108,137 @@ sub resetPublishing {
 }
 print ".";
 
+sub saveSequence {
+	my @lines = ();
+	my $fn = shift;
+	foreach my $i (@_) {
+		next unless (ref $i eq "RItem"); # make sure we only use RItems.
+		print "\n " . $i->link() . ": " . $i->text() . " @" . $i->time() . " (" . $i->cat() . ")";
+		push(@lines,"item=" . $i->title . "\nimage=" . $i->link . "\ndesc=" . $i->text);
+	}
+	my $odir = (FIO::config('Disk','rotatedir') or "lib");
+	$fn =~ s/\..+$//; # remove any existing extension
+	$fn = "$odir/$fn.seq";
+	return FIO::writeLines($fn,\@lines,0);
+}
+print ".";
+
+sub generateSequence {
+	my ($group,$container,$aref) = @_;
+	my @rows = $container->widgets();
+	foreach my $r (@rows) {
+		next unless (ref $r eq "HBox"); # rows should be HBoxes
+		my @buttons = $r->widgets();
+		foreach my $b (@buttons) {
+			next unless (ref $b eq "Button"); # buttons should be Buttons
+			$b->set( backColor => PGK::convertColor("#FFF"), ); # blank all buttons.
+			Pfresh();
+		}
+	}
+	my @list = $group->sequence(); # randomize (or sequence) order of items
+	defined $aref and @$aref = @list; # copy into array ref
+	my $colors = FIO::config('UI','gradient');
+	my @colora = split(",",$colors);
+	foreach my $i (0..$#list) {
+		$list[$i]->widget()->set( backColor => PGK::convertColor($colora[$i % scalar @colora]), );
+		Pfresh();
+	}
+}
+print ".";
+
+sub itemEditor {
+	my ($ri) = @_;
+	my $optbox = Prima::Dialog->create( centered => 1, borderStyle => bs::Sizeable, onTop => 1, width => 300, height => 300, owner => getGUI('mainWin'), text => "Edit " . $ri->title(), valignment => ta::Middle, alignment => ta::Left,);
+	my $bhigh = 18;
+	my $extras = { height => $bhigh, };
+	my $buttons = mb::Ok;
+	my $vbox = $optbox->insert( VBox => autowidth => 1, pack => { fill => 'both', expand => 1, anchor => "nw", }, alignment => ta::Left, );
+	my $nb = labelBox($vbox,"Name",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+	my $lb = labelBox($vbox,"Link",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+	my $tb = labelBox($vbox,"Text",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+	my $cb = labelBox($vbox,"Category",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+	my $ub = labelBox($vbox,"Time",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+	my $ne = $nb->insert( InputLine => name => 'input', text => $ri->title() );
+	my $le = $lb->insert( InputLine => name => 'input', text => $ri->link() );
+	my $te = $tb->insert( InputLine => name => 'input', text => $ri->text() );
+	my $ce = $cb->insert( InputLine => name => 'input', text => $ri->cat() );
+	my $ue = $ub->insert( InputLine => name => 'input', text => $ri->time() );
+	$nb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->title($ne->text); });
+	$lb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->link($le->text); });
+	$tb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->text($te->text); });
+	$cb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->cat($ce->text); });
+	$ub->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->time($ue->text); });
+	my $spacer = $vbox->insert( Label => text => " ", pack => { fill => 'both', expand => 1 }, );
+	my $fresh = Prima::MsgBox::insert_buttons( $optbox, $buttons, $extras); # not reinventing wheel
+	$fresh->set( font => applyFont('button'), );
+	$optbox->execute;
+}
+print ".";
+
 sub tryLoadGroup {
-	my ($target,$fn,$sel,$cols) = @_;
+	my ($target,$fn,$sel,$cols,$gtype,$randbut,$sar) = @_;
 	my %items;
-	my $key;
-	my @roworder;
+	my $group = RRGroup->new(order => 1); # same order as order buttons on Ordering page
+	my $item;
+	my $row = -1;
 	my $line = 0;
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn = "$odir/$fn";
+	print "\n[I] File $fn loading...";
 	foreach my $l (FIO::readFile($fn,getGUI('status'))) {
 		$line++;
 		if ($l =~ m/row=(.+)/) {
-			print "Row $1\n";
-			$key = $1;
-			push(@roworder,$key);
-			$items{$key} = [];
+			main::howVerbose() and print "Row $1\n";
+			defined $item and $group->add($row,$item); # store the item if it's been defined.
+			$item = undef;
+			$row++;
+			$group->rowname($row,$1);
 		} elsif ($l =~ m/item=(.+)/) {
-			print "Item $1\n";
-			push(@{$items{$key}},RItem->new(title => $1));
+			main::howVerbose() and print "Item $1\n";
+			defined $item and $group->add($row,$item); # store the item if it's been defined.
+			$item = RItem->new(title => $1);
 		} elsif ($l =~ m/image=(.+)/) {
-			my $list = ($items{$key} or []);
-			$$list[$#$list]->link($1) if (ref $$list[$#$list] eq "RItem");
-			warn "\n[W] Image outside of item at line $line of $fn! " unless (ref $$list[$#$list] eq "RItem");
+			$item->link($1) if (ref $item eq "RItem");
+			warn "\n[W] Image outside of item at line $line of $fn! " unless (ref $item eq "RItem");
 		} elsif ($l =~ m/desc=(.+)/) {
-			my $list = ($items{$key} or []);
-			$$list[$#$list]->text($1) if (ref $$list[$#$list] eq "RItem");
-			warn "\n[W] Description outside of item at line $line of $fn! " unless (ref $$list[$#$list] eq "RItem");
+			$item->text($1) if (ref $item eq "RItem");
+			warn "\n[W] Image outside of item at line $line of $fn! " unless (ref $item eq "RItem");
 		}
 	}
-	foreach my $k (keys %items) {
-		delete $items{$k} unless (exists $items{$k} && scalar @{$items{$k}});
-	}
-	my $rows = scalar keys %items;
-	$target->insert( Label => text => "$rows rows loaded from $fn." );
+	defined $item and $group->add($row,$item); # store the item if it's been defined.
+	my $rows = scalar $group->rows();
+	$target->insert( Label => text => "$rows rows loaded from $fn.", backColor => PGK::convertColor("#FFF"), );
 	$sel = $target->insert( VBox => name => "buttonbox" );
 	my $buttonscale = (FIO::config('UI','buts') or 15);
 	my $i = 0;
-	foreach my $k (@roworder) {
-		next unless (exists $items{$k}); # empty row deleted, skip it.
-		my $row = $sel->insert( HBox => name => "row $k", pack => { fill => 'x', }, );
-		foreach my $c (@{$items{$k}}) {
-			$c->widget($row->insert( Button => width => $buttonscale, height => $buttonscale, text => "", hint => $c->text() . " (" . $c->link() . ")", ));
+	foreach my $i (0..$group->maxr()) {
+		my @r = $group->row($i);
+		next unless (scalar @r); # empty row deleted, skip it.
+		my $row = $sel->insert( HBox => name => "row $i", pack => { fill => 'x', }, );
+		$row->insert( Button => text => $group->rowname($i), height => $buttonscale + 2 ); # Row name button
+		foreach my $c (@r) {
+			next unless (ref $c eq "RItem"); # skip bad items
+			$c->widget($row->insert( Button => width => $buttonscale, height => $buttonscale, text => "", hint => $c->text() . " (" . $c->link() . ")", onClick => sub { itemEditor($c); }));
 			$c->widget()->set( backColor => PGK::convertColor("#FFF"), );
 		}
 	}
-	return \%items;
+	$gtype->onChange( sub {
+		my $order = $group->order($gtype->value()); # change the group's order type.
+		main::howVerbose() and print "\n[I] Order is now $order"; # say the group's order type.
+		generateSequence($group,$sel,$sar); # show the effect immediately.
+	} );
+	$randbut->set( onClick => sub { generateSequence($group,$sel,$sar); }, ); # set button to generate a new sequence without changing order type.
+	return $group;
 }
 print ".";
-	
+
+sub carpWithout {
+	my ($preq,$action,$preqtxt) = @_;
+	defined $preq and return 0;
+	sayBox(getGUI('mainWin'),"You can't $action until you $preqtxt!");
+	return 1;
+}
+
 =item resetOrdering TARGET
 
 Given a TARGET widget, generates the list widgets needed to perform the Ordering page's functions.
@@ -165,6 +249,7 @@ Dies on error opening library directory.
 
 sub resetOrdering {
 	my ($args) = @_;
+	my @sequence = ();
 	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
 	my $bgcol = $$args[1];
 	$ordpage->empty(); # start with a blank slate
@@ -176,34 +261,34 @@ sub resetOrdering {
 		} readdir(DIR);
 	closedir(DIR);
 	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1}, backColor => PGK::convertColor($bgcol),  );
-	$lister->insert( Label => text => "Choose a file containing URLs:");
-	my ($selector,$rows);
+	$lister->insert( Label => text => "Choose a group file:");
+	my ($selector,$rows,$gtype,$randbut);
 	my $colors = FIO::config('UI','gradient');
-	foreach my $f (@files) {
-		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-			$rows = tryLoadGroup($ordpage,$f,$selector,$colors);
-		});
-	}
 	$ordpage->insert( Label => text => "Ordering", pack => { fill => 'x', expand => 0}, );
 	my $bgcol2 = Common::getColors(5,1,1);
-	my $op2 = $ordpage->insert( HBox => name => "Color List");
-	my $sides = $ordpage->insert( HBox => name => "panes");
-	my $lpane = $sides->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol),  );
-	my $rpane = $sides->insert( VBox => name => "Output", pack => {fill => 'both', expand => 0}, backColor => PGK::convertColor($bgcol2), );
+	my $sides = $ordpage->insert( HBox => name => "panes", pack => { fill => 'both', anchor => 'w', expand => 0, }, );
+	my $lpane = $sides->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0, anchor => "w", }, alignment => ta::Left, backColor => PGK::convertColor($bgcol),  );
+	my $rpane = $sides->insert( VBox => name => "Output", pack => {fill => 'both', expand => 0, anchor => "nw", }, backColor => PGK::convertColor($bgcol2), );
+	foreach my $f (@files) {
+		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
+			$rows = tryLoadGroup($rpane,$f,$selector,$colors,$gtype,$randbut,\@sequence);
+		});
+	}
+	my $op2 = $lpane->insert( HBox => name => "Color List");
 # Group will have:
-	my $gtype = $lpane->insert( XButtons => name => "group type"); # an XButton set to select ordering
+	$gtype = $lpane->insert( XButtons => name => "group type"); # an XButton set to select ordering
 	$gtype->arrange("left"); # horizontal
 	 my @types = (0,"none",1,"striped",2,"grouped",3,"mixed",4,"sequenced"); # defining the buttons
 	 my $def = 1; # selecting default
 	 $gtype->build("Group Type:",$def,@types); # show me the buttons
-	my $calent = PGK::insertDateWidget($lpane,undef,{ label => "Starting Date:", }, ); # a date widget to show the starting date of the ordering (used for sequenced groups)
-	my $randbut = $lpane->insert( Button => text => "Produce Order", onClick => sub { 	devHelp(getGUI('mainWin'),"Generating an order"); },); # a randomize button to generate a new sequence.
-	my $sequencer = $lpane->insert( InputLine => name => 'seq', text => '', ); # an InputLine to hold the sequencing.
-	my $saver = $lpane->insert( Button => text => "Save", onClick => sub { devHelp(getGUI('mainWin'),"Saving a sequence"); }, ); # a button to save group into a group file.
-	my $op = labelBox($rpane,"Ordering page not yet coded.",'r','H', boxfill => 'y', boxex => 0, labfill => 'x', labex => 1);
+	$gtype->onChange( sub { carpWithout($rows,"set order type","choose a group"); } ); # change the group's order type.
+	$randbut = $lpane->insert( Button => text => "Produce Order", onClick => sub { carpWithout($rows,"produce a sequence","choose a group") },); # a randomize button to generate a new sequence.
+	my $saveas = $lpane->insert( InputLine => name => 'seq', text => 'my.seq', ); # an InputLine to hold the sequencing.
+	my $saver = $lpane->insert( Button => text => "Save", onClick => sub { carpWithout($rows,"save a sequence","choose a group") or saveSequence($saveas->text(),@sequence); }, ); # a button to save group into a group file.
 	$op2->insert( Label => text => "Gradient Order:" );
 	my @colora = split(",",$colors);
-	foreach my $i (0..20) {
+	foreach my $i (0..$#colora) {
+		next if ($i > 24);
 		$op2->insert( Button => text => "", width => 9, height => 9, backColor => PGK::convertColor($colora[$i % ($#colora + 1)]));
 	}
 }
@@ -936,20 +1021,6 @@ sub aboutBox {
 	my $target = shift;
 	return sayBox($target,Sui::aboutMeText());
 }
-
-=item sayBox PARENT TEXT
-
-Given a PARENT window and a TEXT to display, generates a simple message box to show the text to the user.
-Returns 0.
-
-=cut
-
-sub sayBox {
-	my ($parent,$text) = @_;
-	Prima::MsgBox::message($text,owner=>$parent);
-	return 0;
-}
-print ".";
 
 =item callOptBox [GUI]
 

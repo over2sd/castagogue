@@ -32,7 +32,7 @@ GetOptions(
 	'enddate|t=s' => \$conclude,
 	'nextid|g=i' => \$nextid,
 	'conf|c=s' => \$conffilename,
-	'verbose|v=i' => \$debug,
+	'verbose|v' => \$debug,
 	'usage|h' => \$helpme,
 	'options|?=s' => \$confme,
 );

@@ -22,6 +22,7 @@ my %data = (
 		tag => ["tag_(context1)","tag_(context2)"],
 		othertag => ["othertag_(context1)","othertag_(context2)"]
 	},
+	objectionablecontent => [],
 );
 
 sub passData {
@@ -177,7 +178,7 @@ sub getDefaults {
 		['Main','tz',-6],
 		['Net','savethumbs',1],
 		['Net','thumbdir',"itn"],
-		['UI','gradient',"#F00,#FF7F00,#FF0,#0F0,#00F,#4B0082,#9400D3,#001,#012,#123,#234,#345,#456,#567,#678,#789,#89A,#9AB,#ABC,#BCD,#CDE,#DEF"],
+		['UI','gradient',"#F00,#F30,#F60,#F90,#FC0,#FF0,#CF0,#9F0,#6F0,#3F0,#0F0,#0F3,#0F6,#0F9,#0FC,#0FF,#0CF,#09F,#06F,#03F,#00F,#30F,#60F,#90F,#C0F,#F0F,#F0C,#F09,#F06,#F03,#EEF,#DDE,#CCD,#BBC,#AAB,#99A,#889,#778,#667,#556,#445,#334,#223,#112,#001"],
 	);
 }
 print ".";
@@ -210,116 +211,6 @@ print ".";
 
 sub aboutMeText {
 	return "$PROGRAMNAME $version\nThis program exists to allow you to preview images in a list of URLs, type your own descriptions of them, and save the description of each file with its URL in a library castagogue can use to populate randomized lists.\nI hope you enjoy it.";
-}
-
-package RRGroup; # Groups for random rotation
-# A monthly rotation may be achieved with an RRGroup of 30/31/61 rows
-=head2 RRGroup
-
-A group for storing randomizeable lists containing names and descriptions in rows for easy manipulation.
-	
-=head3 Usage
-
- my $group = RRGroup->new(order => "striped");
- my ($index,$length) = $group->add(0,{name => "Tom Swift", age => 32},{name => "Harry Houdini", age => 27},{name => "John Smith", address => "1 Any St."});
-
-=head3 Methods
-
-=cut
-sub new {
-	my ($class,%profile) = @_;
-	my $order = RRGroup->order($profile{order},1); # given value might need conversion.
-	my $self = {
-		order => $order,
-		rows => ( $profile{rows} || []),
-	};
-	bless $self,$class;
-	return $self;
-}
-
-sub add { # add hashes to a row.
-	my ($self,$rownum,@rows) = @_;
-	my $r = $self->{rows}; # grab our list of rows
-	my $max = ($#$r < 0 ? 0 : $#$r); # find the highest available row
-	while ($max < $rownum) { # if higher than existing:
-		my $newrow = []; # add a new row, as user indicated desire for a higher row
-		push(@$r,$newrow); # push the new row into the list of rows
-		$max = $#$r; # update max, since we're about to use it
-	}
-	unless (defined $$r[$rownum]) { $$r[$rownum] = []; } # failsafe
-	$r = $$r[$rownum]; # row established. Use this row.
-	$max = ($#$r < 0 ? 0 : $#$r); # find the highest available row
-	my $length = 0;
-	for (my $i = 0; $i <= $#rows; $i++) {
-		my %tr;
-		foreach my $k (keys %{$rows[$i]}) {
-			$tr{$k} = ${$rows[$i]}{$k};
-		}
-		$length++;
-		push(@$r,\%tr);
-	}
-	return ($max,$length);
-}
-
-sub item {
-	my ($self,$rownum,$item) = @_;
-	return {error => -1} unless (defined $rownum && $rownum >= 0 && $rownum <= $self->rows()); # choke if not given a valid row.
-	return {error => -2} unless (defined $item && $item >= 0 && $item <= $self->items($rownum)); # choke if not given a valid item.
-	my @r = $self->row($rownum);
-	return %{$r[$item]}; # return the hash
-}
-
-sub items { # gets the number of items in a row
-	my ($self,$rownum) = @_;
-	return scalar($self->row($rownum));
-}
-
-=item order()
-
-Gets or sets the group's sequencing order. For example:
-
- $group->order("striped",1);  # returns 1 (value of striped)
- $group->order(3,1); 		  # returns 3
- $group->order(-1);			  # returns the RRGroup's order as a name
- $group->order();			  # returns the RRGroup's order as a value
- $group->order("mixed");	  # sets the RRGroup's order to 3 and returns 3
- $group->order(2);	  		  # sets the RRGroup's order to 2 and returns 2
-
-=cut
-
-sub order { # get or set the order
-	my ($self,$order,$nostore) = @_;
-	defined $order || return $self->{order}; # called as a getter.
-	my %orders = ( "none" => 0, "striped" => 1, "grouped" => 2, "mixed" => 3,"sequenced" => 4,);
-	unless ($order =~ m/-?\d+/) {
-		$order = ($orders{$order} or $order);
-	}
-	unless ($order == -1) { # only do this if not querying for order name
-		return $order if ($nostore); # send back the order (probably translated from name to value) if $nostore is true.
-		$self->{order} = int($order) if (defined $order); # otherwise, store the value in our order field.
-	} else {
-		foreach my $k (keys %orders) {
-			return $k if $orders{$k} == $self->{order}; # if given "-1", try to return the name of the order instead of its code value.
-		}
-	}
-	return $self->{order};
-}
-
-sub rows {
-	my $self = shift;
-	my $r = $self->{rows}; # grab our list of rows
-	return scalar(@{$r}); # number of rows.
-}
-
-sub row {
-	my ($self,$rownum) = @_;
-	my $r = $self->{rows}; # grab our list of rows
-	my $max = ($#$r < 0 ? 0 : $#$r); # find the highest available row
-	if ($max < $rownum) { # if higher than existing:
-		return []; # Just return an empty array. The user is responsible for not looping infinitely.
-	}
-	$r = $$r[$rownum]; # row established. Use this row.
-	return @{$r}; # if found, return the array of hashes.
 }
 print ".";
 
