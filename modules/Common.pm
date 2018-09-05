@@ -754,7 +754,20 @@ sub RSSclean {
 my $in = shift;
 	$in =~ s/\015\012?/\012/g; # CR or CRLF to LF
 	$in =~ s/&(?!(?:[a-zA-Z0-9]+|#\d+);)/&#x26;/g; # Lonely Ampersand
+	$in =~ s/(#x26;){2}/#x26;/g; # Too much ampersand processing
 	return $in;
+}
+print ".";
+
+sub pad { # recipe from perlfaq (READ" pad TEXT to LENGTH with CHAR
+	my ($text,$pad_len,$filler,$after) = @_;
+	# TODO: divide pad_len by length of filler for pad patterns instead of characters.
+	unless (defined $after and $after) {
+		substr( $text, 0, 0 ) = $filler x ( $pad_len - length( $text ) ); # maybe pl - l(t) / l(f)?
+	} else {
+		$text .= $filler x ( $pad_len - length( $text ) );
+	}
+	return $text;
 }
 print ".";
 

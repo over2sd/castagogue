@@ -9,7 +9,7 @@ use utf8;
 ####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
 
 my $PROGRAMNAME = "Castapic";
-my $version = "0.009a";
+my $version = "0.010a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGRAMNAME v$version is running.";

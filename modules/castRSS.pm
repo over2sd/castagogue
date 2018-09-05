@@ -31,17 +31,38 @@ sub prepare {
 	my $itemno = 0;
 	my $nextid = FIO::config('Main','nextid');
 	my $purging = (FIO::config('Disk','purgeRSS') or 0); # only delete old RSS items if the user wants it done.
+	my $debug = main::howVerbose();
 	for my $i (@{$rss->{items}}) {
 		my $date = qq{$i->{'pubDate'}};
 		my $end = DateTime->now;
 		my $start = DateTime::Format::DateParse->parse_datetime( $date );
-		if ($nextid < hex($i->{'guid'})) {
-			$nextid = hex($i->{'guid'}) + 1;
+		my $rawid = $i->{'guid'};
+		my ($most,$mid,$least);
+		unless ($rawid =~ m/^[0-9a-zA-Z]{7}-[0-9a-zA-Z]{7}-[0-9a-fA-F]{7}$/) {
+			$rawid =~ /([0-9a-zA-Z]{1,7}?)([0-9a-zA-Z]{1,7}?)([0-9a-fA-F]{7})$/;
+			($most,$mid,$least) = ($1,$2,$3);
+			sprintf($most,"%07s",$most);
+			sprintf($mid,"%07s",$mid);
+			print "\n[I] * Found: $most - $mid - $least...";
+		} else{
+			$rawid =~ m/^([0-9a-zA-Z]{7})-([0-9a-zA-Z]{7})-([0-9a-fA-F]{7})$/;
+			($most,$mid,$least) = ($1,$2,$3);
+		}
+		FIO::config('Disk','gui1',Common::pad($most,7,'0'));
+		FIO::config('Disk','gui2',Common::pad($mid,7,'0'));
+		my $numinhex = hex($least);
+print "For $numinhex...";
+		if ($nextid < $numinhex) {
+			$nextid = $numinhex + 1;
 		}
 		if ($purging && $start < $end) {
 			infMes("Deleting old item from $date.",continues => 1);
 			splice(@{$rss->{items}},$itemno,1);
 			print " (" . $#{$rss->{items}} . " left) ";
+		} elsif ($start < $end) {
+			$debug and infMes("Keeping old item from $date.",continues => 1);
+		} else {
+			$debug and infMes("$date is after " . $end->ymd() . ".\n",continues => 1);
 		}
 		$itemno++;
     }
@@ -133,6 +154,16 @@ sub processFile {
 				} elsif ($descact && $k eq "---") { # this is another line of text
 					my $parsed = Sui::expandMe($2,$ed);
 					$ti->text($ti->text() . "\n$parsed");
+				} elsif ($descact && $k eq "mask") { # this is another line of text (week masked) mask is sum of 1 = first, 2 = second, 4 = third, 8 = fourth, 16 = fifth
+					my $raw = $2;
+					$raw =~ /(\d+),(.+)/;
+					my $week = $1;
+					my $pweek = $ed->week_of_month();
+				print "\n...\t$week vs $pweek\t...";
+					next unless (getBit($pweek,$week));
+				print "+";
+					my $parsed = Sui::expandMe($2,$ed);
+					$ti->text($ti->text() . "\n$parsed");
 				} elsif ($k eq "lead") { # how far ahead the post is dated from the publication date MUST be in the file before the text with date replacements, or the date will be wrong.
 					my $lead = int($2);
 					$ed = $d + DateTime::Duration->new( days=> $lead); # events are posted how far ahead?
@@ -196,6 +227,7 @@ sub processDay {
 	# process daily if present
 	foreach my $i (@items) { # after pulling events, put them in RSS objects
 		(ref($i) eq "RItem") || next;
+		
 #	my ($r,$desc,$url,$pdt,$cat,$title,$pub) = @_;
 		makeItem($r,$i->text,$i->link,$d,$i->cat,$i->name,$i->timestamp);
 	}

@@ -58,7 +58,7 @@ sub item {
 	return {error => -1} unless (defined $rownum && $rownum >= 0 && $rownum <= $self->rows()); # choke if not given a valid row.
 	return {error => -2} unless (defined $item && $item >= 0 && $item <= $self->items($rownum)); # choke if not given a valid item.
 	my @r = $self->row($rownum);
-	return %{$r[$item]}; # return the hash
+	return $r[$item]; # return the hashref
 }
 
 sub items { # gets the number of items in a row

@@ -60,6 +60,7 @@ require Common;
 require FIO;
 require NoGUI;
 require castRSS; # castagogue RSS functions
+require RRGroup;
 
 if ($confme) {
 	NoGUI::callOptBox($confme);

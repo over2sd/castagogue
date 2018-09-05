@@ -111,6 +111,8 @@ print ".";
 sub saveSequence {
 	my @lines = ();
 	my $fn = shift;
+	my $stat = getGUI('status');
+	$stat->push("Writing sequence...");
 	foreach my $i (@_) {
 		next unless (ref $i eq "RItem"); # make sure we only use RItems.
 		print "\n " . $i->link() . ": " . $i->text() . " @" . $i->time() . " (" . $i->cat() . ")";
@@ -119,7 +121,48 @@ sub saveSequence {
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn =~ s/\..+$//; # remove any existing extension
 	$fn = "$odir/$fn.seq";
+	$stat->push("Saving sequence to $fn...");
 	return FIO::writeLines($fn,\@lines,0);
+	$stat->push("Sequence saved.");
+}
+print ".";
+
+sub loadSequence { # to load .seq files into this GUI.
+	devHelp("Loading sequence files");
+}
+print ".";
+
+sub saveDatedSequence {
+	my @lines = ();
+	use DateTime;
+	use DateTime::Format::DateParse;
+	my $stat = getGUI('status');
+	my $datestr = shift;
+	if ($datestr eq "0000-00-00") {
+		carpWithout(undef,"save a dated sequence","choose a date");
+		return -1;
+	}
+	my $date = DateTime::Format::DateParse->parse_datetime( $datestr );
+	my $end = shift;
+	my $l = 0;
+	$stat->push("Running dates from " . $date->ymd() . " for $end days.");
+	my $seq = shift;
+	unless (scalar @$seq) {
+		carpWithout(undef,"save a dated sequence","generate a sequence");
+		$stat->push("Failed to write sequence: No sequence to write!");
+		return -2;
+	}
+	foreach my $i (@$seq) {
+		next if ($l++ > $end);
+#		print "$l,";
+		next unless (ref $i eq "RItem"); # make sure we only use RItems.
+#		print "\ndate=" . $date->ymd() . ">image=" . $i->link . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">";
+		push(@lines,"date=" . $date->ymd() . ">image=" . $i->link . ">title=" . $i->title . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">");
+	}
+	my $fn = "schedule/dated.txt";
+	$stat->push("Saving sequence to $fn...");
+	return FIO::writeLines($fn,\@lines,0);
+	$stat->push("Sequence saved.");
 }
 print ".";
 
@@ -136,7 +179,7 @@ sub generateSequence {
 		}
 	}
 	my @list = $group->sequence(); # randomize (or sequence) order of items
-	defined $aref and @$aref = @list; # copy into array ref
+	defined $aref and push(@$aref,@list); # copy into array ref
 	my $colors = FIO::config('UI','gradient');
 	my @colora = split(",",$colors);
 	foreach my $i (0..$#list) {
@@ -176,7 +219,7 @@ sub itemEditor {
 print ".";
 
 sub tryLoadGroup {
-	my ($target,$fn,$sel,$cols,$gtype,$randbut,$sar) = @_;
+	my ($target,$fn,$sel,$cols,$gtype,$randbut,$timefield,$catfield,$sar) = @_;
 	my %items;
 	my $group = RRGroup->new(order => 1); # same order as order buttons on Ordering page
 	my $item;
@@ -215,7 +258,8 @@ sub tryLoadGroup {
 		my @r = $group->row($i);
 		next unless (scalar @r); # empty row deleted, skip it.
 		my $row = $sel->insert( HBox => name => "row $i", pack => { fill => 'x', }, );
-		$row->insert( Button => text => $group->rowname($i), height => $buttonscale + 2 ); # Row name button
+		$row->insert( Button => text => $group->rowname($i), height => $buttonscale + 2, pack => { fill => 'x', expand => 1 }, ); # Row name button
+		$row->insert( Label => text => " ");
 		foreach my $c (@r) {
 			next unless (ref $c eq "RItem"); # skip bad items
 			$c->widget($row->insert( Button => width => $buttonscale, height => $buttonscale, text => "", hint => $c->text() . " (" . $c->link() . ")", onClick => sub { itemEditor($c); }));
@@ -228,6 +272,9 @@ sub tryLoadGroup {
 		generateSequence($group,$sel,$sar); # show the effect immediately.
 	} );
 	$randbut->set( onClick => sub { generateSequence($group,$sel,$sar); }, ); # set button to generate a new sequence without changing order type.
+	my $typical = $group->item(0,0); # just grab an item for values; the user will probably change them anyway.
+	$timefield->text($typical->time);
+	$catfield->text($typical->category);
 	return $group;
 }
 print ".";
@@ -249,7 +296,7 @@ Dies on error opening library directory.
 
 sub resetOrdering {
 	my ($args) = @_;
-	my @sequence = ();
+	my $sequence = [];
 	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
 	my $bgcol = $$args[1];
 	$ordpage->empty(); # start with a blank slate
@@ -262,7 +309,7 @@ sub resetOrdering {
 	closedir(DIR);
 	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1}, backColor => PGK::convertColor($bgcol),  );
 	$lister->insert( Label => text => "Choose a group file:");
-	my ($selector,$rows,$gtype,$randbut);
+	my ($selector,$rows,$gtype,$randbut,$timee,$cate);
 	my $colors = FIO::config('UI','gradient');
 	$ordpage->insert( Label => text => "Ordering", pack => { fill => 'x', expand => 0}, );
 	my $bgcol2 = Common::getColors(5,1,1);
@@ -271,7 +318,7 @@ sub resetOrdering {
 	my $rpane = $sides->insert( VBox => name => "Output", pack => {fill => 'both', expand => 0, anchor => "nw", }, backColor => PGK::convertColor($bgcol2), );
 	foreach my $f (@files) {
 		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-			$rows = tryLoadGroup($rpane,$f,$selector,$colors,$gtype,$randbut,\@sequence);
+			$rows = tryLoadGroup($rpane,$f,$selector,$colors,$gtype,$randbut,$timee,$cate,$sequence);
 		});
 	}
 	my $op2 = $lpane->insert( HBox => name => "Color List");
@@ -282,9 +329,44 @@ sub resetOrdering {
 	 my $def = 1; # selecting default
 	 $gtype->build("Group Type:",$def,@types); # show me the buttons
 	$gtype->onChange( sub { carpWithout($rows,"set order type","choose a group"); } ); # change the group's order type.
-	$randbut = $lpane->insert( Button => text => "Produce Order", onClick => sub { carpWithout($rows,"produce a sequence","choose a group") },); # a randomize button to generate a new sequence.
-	my $saveas = $lpane->insert( InputLine => name => 'seq', text => 'my.seq', ); # an InputLine to hold the sequencing.
-	my $saver = $lpane->insert( Button => text => "Save", onClick => sub { carpWithout($rows,"save a sequence","choose a group") or saveSequence($saveas->text(),@sequence); }, ); # a button to save group into a group file.
+	$randbut = $lpane->insert( Button => text => "Produce Order", onClick => sub { carpWithout($rows,"produce a sequence","choose a group") }, pack => { fill => 'x' }, ); # a randomize button to generate a new sequence.
+	my $cateb = labelBox($lpane,"Category: ",'category','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+	$cate = $cateb->insert( InputLine => text => "");
+	my $catea = $cateb->insert( Button => text => "Apply to All", onClick => sub {
+			unless (carpWithout($rows,"apply a category to all in group","choose a group")) { # don't allow anything to happen before group is loaded!
+				my $height = $rows->maxr(); # how many rows in group?
+				foreach my $i (0..$height) { # traverse rows
+					my $width = $rows->items($i); # how many columns in row?
+					foreach my $j (0..$width - 1) { # traverse columns
+						my $t = $rows->item($i,$j); # pick each item
+						$t->cat($cate->text); # all this to set this item's category to the text box's value.
+					}
+				}
+			}
+		});
+	my $timeeb = labelBox($lpane,"Publish time (24h form HHMM): ",'time','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+	$timee = $timeeb->insert( InputLine => text => "");
+	my $timeea = $timeeb->insert( Button => text => "Apply to All", onClick => sub {
+			unless (carpWithout($rows,"apply a publishing time to all in group","choose a group")) { # don't allow anything to happen before group is loaded!
+				my $height = $rows->maxr(); # how many rows in group?
+				foreach my $i (0..$height) { # traverse rows
+					my $width = $rows->items($i); # how many columns in row?
+					foreach my $j (0..$width - 1) { # traverse columns
+						my $t = $rows->item($i,$j); # pick each item
+						$t->time($timee->text); # all this to set this item's time to the text box's value.
+					}
+				}
+			}
+		});
+	my $savings = $lpane->insert( HBox => name => "savers" );
+	my $saveas;
+	my $saver = $savings->insert( Button => text => "Save as...", onClick => sub { carpWithout($rows,"save a sequence","choose a group") or saveSequence($saveas->text(),$sequence); }, ); # a button to save group into a group file.
+	$saveas = $savings->insert( InputLine => name => 'seq', text => 'my.seq', ); # an InputLine to hold the sequencing.
+	my $savecal = $lpane->insert( HBox => name => "box" );
+	my $calent = PGK::insertDateWidget($savecal,undef,{ label => "Starting Date:", }, ); # a date widget to show the starting date of the ordering (used for sequenced groups)
+	my $sl = $savecal->insert( Label => text => "Length of Sequence");
+	my $seqlen = $savecal->insert( SpinEdit => name => 'size', max => 365, min => 1, step => 5, value => 10, width => 50);
+	my $savedate = $savecal->insert( Button => text => "Save to dated.txt", onClick => sub { carpWithout($rows,"save a sequence","choose a group") or saveDatedSequence($calent->text,$seqlen->value,$sequence); }, );
 	$op2->insert( Label => text => "Gradient Order:" );
 	my @colora = split(",",$colors);
 	foreach my $i (0..$#colora) {
@@ -568,7 +650,7 @@ sub tryLoadDesc {
 			$descact = 0;
 			my $pi = RItem->new( title => $ti->{title}, text => $ti->{text}, link => $ti->{link}, ); # separate the item from this loop
 			$resettarget->insert( Button => # place button for adding...
-				text => "Add " . $pi->text(),
+				text => "Add " . Common::shorten($pi->text(),24,10),
 				height => $buttonheight,
 				onClick => sub {
 					my $pr;
@@ -604,16 +686,37 @@ sub tryLoadDesc {
 		}
 #defined $debug and print "\n $k = $2...";
 	}
-	$resettarget->insert( Button => # place button for adding...
-		text => "Add " . $ti->text(),
+	$resettarget->insert( Button => # place button for adding... one final button.
+		text => "Add " . Common::shorten($ti->text(),24,10),
+		height => $buttonheight,
 		onClick => sub {
-			my $pr = labelBox($target,$ti->text(),$ti->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
-			$pr->insert( Button => # which places button for removing...
-				text => "Remove",
-				onClick => sub { $pr->destroy(); return 0; },
-			);
+			my $pr;
+			if ($sched) {
+				my $fill = 0; # filler variable
+				my ($error,$server,$img,$lfp) = fetchapic($ti->link,$fill,$stat);
+				return $error if $error;
+				my $viewsize = 100;
+				my $pic = Prima::Image->new;
+				my $lfn = "$lfp$img";
+				$pic->load($lfn);
+				$pr = labelBox($target,$ti->text(),$ti->title(),'V', boxfill => 'both', boxex => 0, labfill => 'x', labex => 1);
+				if (-r $lfp . $img ) {
+					my ($pic,$iz) = showapic($lfp,$img,$viewsize);
+					$pr->insert( ImageViewer =>
+						name => $ti->title(), width => $viewsize, height => $viewsize,
+						pack => {fill => 'none'}, image => $pic);
+					Pfresh();
+				}
+			} else {
+				$pr = labelBox($target,$ti->text(),$ti->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+				$pr->set( pack => { anchor => 'n', valignment => ta::Top } );
+				$pr->insert( Button => # which places button for removing...
+					text => "Remove",
+					onClick => sub { $pr->destroy(); return 0; }, );
+			}
 		}
 	) unless ($ti->title() eq "Unnamed");
+	push(@$ar,$ti) unless ($ti->title() eq "Unnamed"); # store record
 	$resettarget->insert( Button => text => "Pick different file", onClick => sub { refreshDescList($resettarget,$target,$ar); }, );
 	getGUI('status')->push("Done loading $count items.");
 	return 0; # success!
@@ -664,7 +767,6 @@ sub resetGrouping {
 		}
 	}
 	my $error = insertGroupLoaders($rpane,$preview,$tar,$rows,$bgcol,$buttonheight);
-	my $op = labelBox($ordpage,"Grouping page not yet coded.",'r','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
 }
 print ".";
 
@@ -801,7 +903,7 @@ sub tryLoadInput {
 			$row->insert( Label => text => "$img could not be loaded for viewing." );
 		}
 		$row->insert( Label => text => ":");
-		my $desc = $row->insert( InputLine => width => 100, name => "$line", text => "" );
+		my $desc = $row->insert( InputLine => width => 350, name => "$line", text => "" );
 		$desc->set(onLeave => sub { $$hashr{$okey}{desc} = $desc->text; });
 #		$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store, not by what the button does but by causing the input to lose focus.
 #		$row->height($collapsed);
@@ -892,7 +994,7 @@ sub populateMainWin {
 	my ($dbh,$gui,$refresh) = @_;
 	($refresh && (defined $$gui{pager}) && $$gui{pager}->destroy());
 	my $win = $$gui{mainWin};
-	my @tabs = qw( Describing Grouping Ordering Publishing Scheduling ); # TODO: generate dynamically
+	my @tabs = qw( Describing Grouping Ordering Scheduling Publishing ); # TODO: generate dynamically
 	my $pager = $win->insert( Pager => name => 'Pages', pack => { fill => 'both', expand => 1}, );
 	$pager->build(@tabs);
 	my $i = 1;
@@ -924,6 +1026,17 @@ sub populateMainWin {
 	my $op = labelBox($ordpage,"Ordering page not yet coded.",'o','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
 	$op->set(backColor => PGK::convertColor($color));
 	$pager->setSwitchAction("Ordering",\&resetOrdering,$ordpage,$color); # refresh this page whenever we switch to it
+
+	# Scheduling tab
+	$color = Common::getColors(7,1,1);
+	my $schpage = $pager->insert_to_page($currpage++,VBox =>
+		backColor => ColorRow::stringToColor($color),
+		pack => { fill => 'both', },
+	);
+	$pager->setSwitchAction("Scheduling",\&resetScheduling,$schpage,$color); # refresh this page whenever we switch to it
+	my $sp = labelBox($schpage,"Scheduling page not yet coded.",'r','H', boxfill => 'x', boxex => 1, labfill => 'x', labex => 1);
+	$sp->set(backColor => PGK::convertColor($color));
+	$color = Common::getColors(($i++ % 2 ? 0 : 7),1);
 
 	# Publishing tab
 	$color = Common::getColors(8,1,1);
@@ -969,17 +1082,6 @@ sub populateMainWin {
 	$pubpage->insert( Label => text => "Now is the time for all good men... 23", backColor => ColorRow::stringToColor($color));
 	$color = Common::getColors(24,1,1);
 	$pubpage->insert( Label => text => "Now is the time for all good men... 24", backColor => ColorRow::stringToColor($color));
-
-	# Scheduling tab
-	$color = Common::getColors(7,1,1);
-	my $schpage = $pager->insert_to_page($currpage++,VBox =>
-		backColor => ColorRow::stringToColor($color),
-		pack => { fill => 'both', },
-	);
-	$pager->setSwitchAction("Scheduling",\&resetScheduling,$schpage,$color); # refresh this page whenever we switch to it
-	my $sp = labelBox($schpage,"Scheduling page not yet coded.",'r','H', boxfill => 'x', boxex => 1, labfill => 'x', labex => 1);
-	$sp->set(backColor => PGK::convertColor($color));
-	$color = Common::getColors(($i++ % 2 ? 0 : 7),1);
 
 	$pager->switchToPanel("Describing");
 	$$gui{pager} = $pager;

@@ -78,6 +78,7 @@ sub category {
 sub time {
 	my ($self,$text) = @_;
 	defined $text or return $self->get('time');
+	$text =~ /(\d\d)(\d\d)/ or return $self->get('time'); # don't accept an improper time
 	return $self->set('time',$text);
 }
 
