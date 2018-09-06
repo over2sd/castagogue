@@ -41,20 +41,24 @@ sub prepare {
 		unless ($rawid =~ m/^[0-9a-zA-Z]{7}-[0-9a-zA-Z]{7}-[0-9a-fA-F]{7}$/) {
 			$rawid =~ /([0-9a-zA-Z]{1,7}?)([0-9a-zA-Z]{1,7}?)([0-9a-fA-F]{7})$/;
 			($most,$mid,$least) = ($1,$2,$3);
-			sprintf($most,"%07s",$most);
-			sprintf($mid,"%07s",$mid);
+			$most = sprintf("%07s",$most);
+			$mid = sprintf("%07s",$mid);
 			print "\n[I] * Found: $most - $mid - $least...";
 		} else{
 			$rawid =~ m/^([0-9a-zA-Z]{7})-([0-9a-zA-Z]{7})-([0-9a-fA-F]{7})$/;
 			($most,$mid,$least) = ($1,$2,$3);
 		}
-		FIO::config('Disk','gui1',Common::pad($most,7,'0'));
-		FIO::config('Disk','gui2',Common::pad($mid,7,'0'));
+		my $nextmost = (FIO::config('Disk','gui1') or 0);
+		my $nextmid = (FIO::config('Disk','gui2') or 0);
 		my $numinhex = hex($least);
 print "For $numinhex...";
 		if ($nextid < $numinhex) {
 			$nextid = $numinhex + 1;
 		}
+		$most = ($nextmost > hex($most) ? $nextmost : hex($most));
+		$mid = ($nextmid > hex($mid) ? $nextmid : hex($mid));
+		FIO::config('Disk','gui1',$most); # save as int
+		FIO::config('Disk','gui2',$mid); # save as int
 		if ($purging && $start < $end) {
 			infMes("Deleting old item from $date.",continues => 1);
 			splice(@{$rss->{items}},$itemno,1);
@@ -72,16 +76,33 @@ print "For $numinhex...";
 }
 print ".";
 
-#new for castagogue
 =item getGUID()
-	Generates a very simple ID by incrementing the number in the INI file.
+	Generates an adequate ID by incrementing the number in the INI file.
 	returns an ID.
 =cut
 sub getGUID {
-	print "?";
+	print "G";
 	my $value = FIO::config('Main','nextid');
+	my $v3 = FIO::config('Disk','gui1');
+	my $v2 = FIO::config('Disk','gui2');
+	if ($value >= hex("fffffff")) {
+		$value -= hex("fffffff");
+		if ($v2 >= hex("fffffff")) {
+			$v2 -= hex("fffffff");
+			if ($v3 >= hex("fffffff")) {
+				$v3 -= hex("fffffff");
+			}
+			$v3++;
+		}
+		$v2++;
+	}
 	FIO::config('Main','nextid',$value + 1);
-	return $value;
+	FIO::config('Disk','gui1',$v2);
+	FIO::config('Disk','gui2',$v3);
+	$v3 = Common::pad($v3,7,"0");
+	$v2 = Common::pad($v2,7,"0");
+	$value = Common::pad($value,7,"0");
+	return "$v3-$v2-$value";
 }
 
 #new for castagogue
@@ -112,18 +133,75 @@ sub timeAsRSS {
 }
 print ".";
 
-=item processFile()
-	Given a filename ($fn), a DateTime ($d), and an RSS object ($r), opens the text file and looks for certain keywords, whose data will be processed and stored with all tokens replaced with appropriate values.
+=item processDatedFile()
+	Given a filename ($fn, though it should generally be "dated.txt") and an RSS object ($r), opens the text file and looks for certain keywords, whose data will be processed and stored with all tokens replaced with appropriate values.
 	Optionally, add an output object where status messages should go ($output).
-	Returns error code.
+	Returns a hash of all dated items.
+=cut
+sub processDatedFile {
+	my ($fn,$output) = @_;
+	print "\n[I] Reading $fn..";
+	$fn = "schedule/$fn";
+	my $v = main::howVerbose(); 
+	if ( $v > 2) { print " $fn"; }
+	my %items;
+	unless ( -e $fn ) { # file does not exist; skipping
+		print "-" if ($v > 0);
+		return %items;
+	} else {
+		if ($v > 0) {
+			print "+";
+		} else {
+			print ".";
+		}
+		my $fh;
+		unless (open($fh,"<$fn")) { # open file
+			$output and $output->push("\n[E] Error opening file: $!" );
+			FIO:config('Main','fatalerr') && die "I am slain by unopenable file $fn because $!";
+		} else {
+			my $lead = DateTime::Duration->new( days=> (FIO::config('Main','eventlead') or 0)); # so we can add to it without losing our place.
+			while (my $line = <$fh>) { # read lines
+				chomp $line;
+				my ($ldate,$limg,$ltitle,$ldesc,$ltime,$lcat);
+				$ldate = $1 if $line =~ /date=(\d{4}-\d{2}-\d{2})>/;
+				my $d = DateTime::Format::DateParse->parse_datetime( $ldate );
+				my $rdate = substr(timeAsRSS($d),0,-15);
+				my $ti = RItem->new(date => "$rdate");
+				my $ed = $d + $lead; # so we can add to it without losing our place.
+				$limg = $1 if $line =~ /image=(.+?)>/;
+				$ltitle = $1 if $line =~ /title=([\w\s]+)>/;
+				$ldesc = $1 if $line =~ /desc=(.+?)>/;
+				$ltime = $1 if $line =~ /time=(\d{3,4})>/;
+				$lcat = $1 if $line =~ /cat=(\w+?)>/;
+				$ldesc = Sui::expandMe($ldesc,$ed); # this is date/description text
+				$ltitle = Sui::expandMe($ltitle,$ed); # this is date/description text
+				$ti->text($ldesc);
+				$ti->link($limg);
+				$ti->name($ltitle);
+				$ti->time(sprintf("%04i",$ltime));
+				$ti->category($lcat);
+				$items{$ldate} = [] unless exists $items{$ldate};
+				push(@{$items{$ldate}},$ti); # store record
+				print ".";
+			}
+			close($fh); # close file
+		}
+	}
+	return %items;
+}
+
+=item processFile()
+	Given a filename ($fn), a DateTime ($d), opens the text file and looks for certain keywords, whose data will be processed and stored with all tokens replaced with appropriate values.
+	Optionally, add an output object where status messages should go ($output).
+	Returns array of RItems.
 =cut
 sub processFile {
-	my ($fn,$d,$output) = @_;
+	my ($fn,$d,$hr,$output) = @_;
 	$fn = "schedule/$fn";
 	my $v = main::howVerbose(); 
 	if ( $v > 2) { print " $fn"; }
 	my @items = [];
-	unless ( -e $fn ) {
+	unless ( -e $fn ) { # file does not exist; skipping
 		print "-" if ($v > 0);
 		return @items;
 	} else {
@@ -184,6 +262,8 @@ sub processFile {
 					$descact = 0;
 				} elsif ($k eq "last") { # the end of the post record
 					$descact = 0;
+					next if (exists $$hr{$ti->timestamp} && findIn($ti->title,@{$$hr{$ti->timestamp}}));
+					push(@{$$hr{$ti->timestamp}},$ti->title);
 					push(@items,$ti); # store record
 					last if(!defined $2 || $2 eq "1"); # if last item, exit loop
 					print $fn;
@@ -206,7 +286,7 @@ sub processFile {
 	returns the RSS object? or any error codes? Haven't decided.
 =cut
 sub processDay {
-	my ($d,$r,$out) = @_;
+	my ($d,$r,$hr,$out) = @_;
 	if (main::howVerbose() > 0) {
 		print "\nFor " . $d->ymd() . ": ";
 	} else {
@@ -227,11 +307,29 @@ sub processDay {
 	# process daily if present
 	foreach my $i (@items) { # after pulling events, put them in RSS objects
 		(ref($i) eq "RItem") || next;
-		
+		next if (exists $$hr{$i->timestamp} && findIn($i->title,@{$$hr{$i->timestamp}}));
+		push(@{$$hr{$i->timestamp}},$i->title);
 #	my ($r,$desc,$url,$pdt,$cat,$title,$pub) = @_;
 		makeItem($r,$i->text,$i->link,$d,$i->cat,$i->name,$i->timestamp);
 	}
 	return 0;
+}
+print ".";
+
+
+=item catalogRSS()
+	Given an RSS object ($r), returns a hash of its item dates as keys, and its item titles for each date as an arrayref of values.
+
+=cut
+sub catalogRSS {
+	my $r = shift;
+	my %items;
+	foreach my $i (@{$r->{items}}) {
+		my $ldate = $i->{pubDate};
+		$items{$ldate} = [] unless exists $items{$ldate};
+		push(@{$items{$ldate}},$i->{title}); # store record
+	}
+	return %items;
 }
 print ".";
 
@@ -277,8 +375,12 @@ sub processRange {
 	}
 	($ds < $dp) && die "I cannot go backward in time. Sorry.\n";
 	infMes("Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":");
+	my %items = catalogRSS($r); # grab item titles to prevent duplication.
+use Data::Dumper; print Dumper \%items;
+	my %dated = processDatedFile("dated.txt",\%items,$out));
 	while ($dp <= $ds) {
-		processDay($dp,$r,$out);
+		processDay($dp,$r,\%items,$out);
+		# TODO: Add items from %dated ($dated{$dp})
 		$dp = $dp + DateTime::Duration->new( days=> 1 );
 	}
 	return 0;

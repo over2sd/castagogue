@@ -6,7 +6,7 @@ use utf8;
 
 # castagogue
 my $PROGNAME = "Castagogue";
-my $version = "0.011a";
+my $version = "0.012a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGNAME v$version is running.";
@@ -76,8 +76,8 @@ my ($index,$length) = $group->add(0,{name => "Tom Swift", age => 32},{name => "H
 #print "Put $length items at index $index of row 1.\n";
 ($index,$length) = $group->add(0,{alf => "bet"});
 #print "Put $length items at index $index of row 0.\n";
-my %i = $group->item(0,1);
-print "Contains " . $group->rows() . " rows. The first row contains " . $group->items(0) . " items. Second item in the row: " . $i{name} . "=" . $i{age} . "!\n";
+my $i = $group->item(0,1);
+print "Contains " . $group->rows() . " rows. The first row contains " . $group->items(0) . " items. Second item in the row: " . $$i{name} . "=" . $$i{age} . "!\n";
 ### End of test code ###
 
 FIO::loadConf($conffilename);

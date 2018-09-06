@@ -1361,7 +1361,7 @@ sub labelBox {
 		$box = $parent->insert( HBox => name => "$name", alignment => ta::Left, );
 		$box->pack( fill => ($args{boxfill} or 'none'), expand => (defined $args{boxex} ? $args{boxex} : 1), padx => (defined $args{margin} ? $args{margin} : 1), pady => (defined $args{margin} ? $args{margin} : 1), );
 	}
-	$box->insert( Label => text => "$label", valignment => ta::Middle, alignment => ta::Left, pack => { fill => (defined $args{labfill} ? $args{labfill} : 'x'), expand => (defined $args{labex} ? $args{labex} : 0), }  );
+	$box->insert( Label => text => "$label", autoHeight => 1, valignment => ta::Middle, alignment => ta::Left, pack => { fill => (defined $args{labfill} ? $args{labfill} : 'x'), expand => (defined $args{labex} ? $args{labex} : 0), }  );
 	return $box;
 }
 print ".";

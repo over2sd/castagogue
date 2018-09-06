@@ -116,7 +116,7 @@ sub saveSequence {
 	foreach my $i (@_) {
 		next unless (ref $i eq "RItem"); # make sure we only use RItems.
 		print "\n " . $i->link() . ": " . $i->text() . " @" . $i->time() . " (" . $i->cat() . ")";
-		push(@lines,"item=" . $i->title . "\nimage=" . $i->link . "\ndesc=" . $i->text);
+		push(@lines,"image=" . $i->link . ">title=" . $i->title . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">");
 	}
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn =~ s/\..+$//; # remove any existing extension
@@ -313,24 +313,25 @@ sub resetOrdering {
 	my $colors = FIO::config('UI','gradient');
 	$ordpage->insert( Label => text => "Ordering", pack => { fill => 'x', expand => 0}, );
 	my $bgcol2 = Common::getColors(5,1,1);
+	my $op2 = $ordpage->insert( HBox => name => "Color List");
 	my $sides = $ordpage->insert( HBox => name => "panes", pack => { fill => 'both', anchor => 'w', expand => 0, }, );
-	my $lpane = $sides->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0, anchor => "w", }, alignment => ta::Left, backColor => PGK::convertColor($bgcol),  );
-	my $rpane = $sides->insert( VBox => name => "Output", pack => {fill => 'both', expand => 0, anchor => "nw", }, backColor => PGK::convertColor($bgcol2), );
+	my $lpane = $sides->insert( HBox => name => "Input", pack => {fill => 'y', expand => 0, anchor => "w", }, alignment => ta::Left, backColor => PGK::convertColor($bgcol),  );
+	my $rpane = $sides->insert( VBox => name => "Output", pack => {fill => 'both', expand => 1, anchor => "nw", }, backColor => PGK::convertColor($bgcol2), );
 	foreach my $f (@files) {
 		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
 			$rows = tryLoadGroup($rpane,$f,$selector,$colors,$gtype,$randbut,$timee,$cate,$sequence);
 		});
 	}
-	my $op2 = $lpane->insert( HBox => name => "Color List");
-# Group will have:
 	$gtype = $lpane->insert( XButtons => name => "group type"); # an XButton set to select ordering
-	$gtype->arrange("left"); # horizontal
+	my $llpane = $lpane->insert( VBox => name => "leftish pane" );
+# Group will have:
+	$gtype->arrange("top"); # vertical
 	 my @types = (0,"none",1,"striped",2,"grouped",3,"mixed",4,"sequenced"); # defining the buttons
 	 my $def = 1; # selecting default
 	 $gtype->build("Group Type:",$def,@types); # show me the buttons
 	$gtype->onChange( sub { carpWithout($rows,"set order type","choose a group"); } ); # change the group's order type.
-	$randbut = $lpane->insert( Button => text => "Produce Order", onClick => sub { carpWithout($rows,"produce a sequence","choose a group") }, pack => { fill => 'x' }, ); # a randomize button to generate a new sequence.
-	my $cateb = labelBox($lpane,"Category: ",'category','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+	$randbut = $llpane->insert( Button => text => "Produce Order", onClick => sub { carpWithout($rows,"produce a sequence","choose a group") }, pack => { fill => 'x' }, ); # a randomize button to generate a new sequence.
+	my $cateb = labelBox($llpane,"Category: ",'category','V', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
 	$cate = $cateb->insert( InputLine => text => "");
 	my $catea = $cateb->insert( Button => text => "Apply to All", onClick => sub {
 			unless (carpWithout($rows,"apply a category to all in group","choose a group")) { # don't allow anything to happen before group is loaded!
@@ -344,7 +345,7 @@ sub resetOrdering {
 				}
 			}
 		});
-	my $timeeb = labelBox($lpane,"Publish time (24h form HHMM): ",'time','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+	my $timeeb = labelBox($llpane,"Publish time\n(24h form HHMM): ",'time','V', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
 	$timee = $timeeb->insert( InputLine => text => "");
 	my $timeea = $timeeb->insert( Button => text => "Apply to All", onClick => sub {
 			unless (carpWithout($rows,"apply a publishing time to all in group","choose a group")) { # don't allow anything to happen before group is loaded!
@@ -358,12 +359,12 @@ sub resetOrdering {
 				}
 			}
 		});
-	my $savings = $lpane->insert( HBox => name => "savers" );
+	my $savings = $llpane->insert( HBox => name => "savers" );
 	my $saveas;
 	my $saver = $savings->insert( Button => text => "Save as...", onClick => sub { carpWithout($rows,"save a sequence","choose a group") or saveSequence($saveas->text(),$sequence); }, ); # a button to save group into a group file.
 	$saveas = $savings->insert( InputLine => name => 'seq', text => 'my.seq', ); # an InputLine to hold the sequencing.
-	my $savecal = $lpane->insert( HBox => name => "box" );
-	my $calent = PGK::insertDateWidget($savecal,undef,{ label => "Starting Date:", }, ); # a date widget to show the starting date of the ordering (used for sequenced groups)
+	my $savecal = $llpane->insert( VBox => name => "box" );
+	my $calent = PGK::insertDateWidget($savecal,undef,{ label => "Start on:", }, ); # a date widget to show the starting date of the ordering (used for sequenced groups)
 	my $sl = $savecal->insert( Label => text => "Length of Sequence");
 	my $seqlen = $savecal->insert( SpinEdit => name => 'size', max => 365, min => 1, step => 5, value => 10, width => 50);
 	my $savedate = $savecal->insert( Button => text => "Save to dated.txt", onClick => sub { carpWithout($rows,"save a sequence","choose a group") or saveDatedSequence($calent->text,$seqlen->value,$sequence); }, );
