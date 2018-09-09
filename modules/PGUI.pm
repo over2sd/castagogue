@@ -7,8 +7,8 @@ require Exporter;
 
 use FIO qw( config );
 use PGK;
-use Prima qw( ImageViewer Sliders );
-use Common qw( missing );
+use Prima qw( ImageViewer Sliders Calendar );
+use Common qw( missing infMes );
 use Options;
 use RRGroup;
 use RItem;
@@ -31,6 +31,40 @@ package PGUI;
 
 my @openfiles = [];
 
+sub schedulePost {
+	my ($button,$target,$fields) = @_;
+	my $stat = getGUI('status');
+	my $fn = "schedule/dated.txt";
+	if ($$fields{calent}->text() eq "0000-00-00") { # did you forget to set the date?
+		$stat->push("A valid date is required to schedule a post!");
+		return -1;
+	}
+	if ($$fields{catent}->text() eq "category") { # did you forget to set the date?
+		$stat->push("A valid category (even 'general') is required to schedule a post!");
+		return -2;
+	}
+	$stat->push("Appending post to $fn...");
+	$button->text("Saving...");
+	$button->set( enabled => 0 );
+	Pfresh();
+	my @lines = ();
+	my $description = $$fields{desced}->text();
+	$description =~ s/\s+^//; # trim trailing whitespace
+	push(@lines,"date=" . $$fields{calent}->text() . ">image=" . $$fields{image}->text() . ">title=" . $$fields{titlent}->text() . ">desc=" . $description . ">time=" . $$fields{timent}->text() . ">cat=" . $$fields{catent}->text() . ">");
+	my $err = FIO::writeLines($fn,\@lines,0);
+	$stat->push($err ? "Error when saving: $!" : "Post saved.");
+	delete $$fields{image};
+	$target->empty();
+	$target->insert(Label => text => "Saved $$fields{'title'} to $fn.");
+	$target->insert(Label => text => " ", pack => { fill => 'y', expand => 1, }, );
+	$button->text("Schedule");
+	$button->set( enabled => 1 );
+	Pfresh();
+	return $err;
+}
+print ".";
+
+
 =item resetScheduling TARGET
 
 Given a TARGET widget, generates the list widgets needed to perform the Scheduling page's functions.
@@ -51,11 +85,37 @@ sub resetScheduling {
 	my $sched = 1;
 	my $stage = $panes->insert( VBox => name => "stager", pack => { fill => 'both' }, );
 	my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
-	my $tb = labelBox($stage,"Content: ",'H', boxfill => 'x', boxex => 1, labfill => 'x', labex => 1, );
-	my $tbi = $tb->insert( Edit => text => "This is a wonderful place to put the final description text.", pack => { fill => 'both' }, width => 400, height => 80, );
-	refreshDescList($lister,$prev,$tar,$sched);
+	$stage->insert(Label => text => " ", pack => { fill => 'both', expand => 1, }, );
+	my $hb = labelBox($stage,"Title: ",'tbox','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1, );
+	my $hbi = $hb->insert( InputLine => text => "Change Me; I'm used for indexing", width => 300, pack => { alignment => ta::Left, fill => 'x', }, );
+	my $tb = labelBox($stage,"Content: ",'dbox','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1, );
+	my $tbi = $tb->insert( InputLine => text => "This is a wonderful place to put the final description text.", pack => { fill => 'both' }, width => 400, );
+	my $detbox = $stage->insert( HBox => name => "me" );
+	my $calent = $detbox->insert( InputLine => text => '0000-00-00', name => 'imadate' );
+	my $calbut = $detbox->insert( SpeedButton => name => ('showcal'), onClick => sub {
+		my $calwin = Prima::Dialog->create( size => [ 250, 275 ], text => "Choose Date",);
+		my $cal = $calwin->insert( Calendar => useLocale => 0, onChange  => sub { $calent->text(sprintf("%04d-%02d-%02d",$_[0]->year + 1900, $_[0]->month + 1, $_[0]->day)); }, pack => { fill => 'both', expand => 1, side => 'top',}, sizeMin => [200,200],);
+		$cal->date_from_time( localtime );
+		$calwin->insert( SpeedButton => text => "Cancel", pack => { fill => 'x', side => 'bottom', expand => 0}, onClick => sub { $calent->text('0000-00-00'); $calwin->close(); }, );
+		$calwin->insert( SpeedButton => text => "Set", pack => { fill => 'x', side => 'bottom', expand => 0}, onClick => sub { $calent->text(sprintf("%04d-%02d-%02d",$cal->year + 1900, $cal->month + 1, $cal->day)); $calwin->close(); }, );
+		$calwin->execute;
+		$calwin->destroy;
+	}, imageFile => 'modules/cal-icon.png', );
+	my $timent = $detbox->insert( InputLine => text => "0800", hint => "Time to publish post" );
+	my $catent = $detbox->insert( InputLine => name => "category", hint => "Post category" );
+	my %tunnel;
+	my $sbut = $detbox->insert( Button => text => "Schedule", onClick => sub { carpWithout($tunnel{image},"schedule a post","choose a post image") or schedulePost($_[0],$prev,\%tunnel); } );
+	$tunnel{calent} = $calent;
+	$tunnel{timent} = $timent;
+	$tunnel{catent} = $catent;
+	$tunnel{titlent} = $hbi;
+	$tunnel{desced} = $tbi;
+	$prev->{tunnel} = \%tunnel;
 
-	my $op = labelBox($schpage,"Ordering page not yet coded.",'r','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 1);
+	refreshDescList($lister,$prev,$tar,$sched);
+# Show these: fields for each dated.txt field, calendar for scheduling, time fields, schedule button
+# will this tab be used for both individual schedule items and for weekly schedules? Do I need another tab?
+	my $op = $schpage->insert( Button => text => "Weekly Schedule", onClick => sub { devHelp("Setting a weekly schedule"); }, pack => { fill => 'x', expand => 0, }, );
 # This page will be for scheduling specific images with specific dates
 # buttons to load dsc files
 # a pane for dsc files to load into
@@ -158,11 +218,13 @@ sub saveDatedSequence {
 		next unless (ref $i eq "RItem"); # make sure we only use RItems.
 #		print "\ndate=" . $date->ymd() . ">image=" . $i->link . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">";
 		push(@lines,"date=" . $date->ymd() . ">image=" . $i->link . ">title=" . $i->title . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">");
+		$date += DateTime::Duration->new( days=> 1 );
 	}
 	my $fn = "schedule/dated.txt";
 	$stat->push("Saving sequence to $fn...");
-	return FIO::writeLines($fn,\@lines,0);
+	my $e = FIO::writeLines($fn,\@lines,0);
 	$stat->push("Sequence saved.");
+	return $e;
 }
 print ".";
 
@@ -227,7 +289,7 @@ sub tryLoadGroup {
 	my $line = 0;
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn = "$odir/$fn";
-	print "\n[I] File $fn loading...";
+	infMes("File $fn loading...",1);
 	foreach my $l (FIO::readFile($fn,getGUI('status'))) {
 		$line++;
 		if ($l =~ m/row=(.+)/) {
@@ -268,7 +330,7 @@ sub tryLoadGroup {
 	}
 	$gtype->onChange( sub {
 		my $order = $group->order($gtype->value()); # change the group's order type.
-		main::howVerbose() and print "\n[I] Order is now $order"; # say the group's order type.
+		main::howVerbose() and infMes("Order is now $order",1); # say the group's order type.
 		generateSequence($group,$sel,$sar); # show the effect immediately.
 	} );
 	$randbut->set( onClick => sub { generateSequence($group,$sel,$sar); }, ); # set button to generate a new sequence without changing order type.
@@ -307,11 +369,11 @@ sub resetOrdering {
 		&& -f "$odir/$_"
 		} readdir(DIR);
 	closedir(DIR);
+	$ordpage->insert( Label => text => "Ordering", pack => { fill => 'x', expand => 0}, );
 	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1}, backColor => PGK::convertColor($bgcol),  );
 	$lister->insert( Label => text => "Choose a group file:");
 	my ($selector,$rows,$gtype,$randbut,$timee,$cate);
 	my $colors = FIO::config('UI','gradient');
-	$ordpage->insert( Label => text => "Ordering", pack => { fill => 'x', expand => 0}, );
 	my $bgcol2 = Common::getColors(5,1,1);
 	my $op2 = $ordpage->insert( HBox => name => "Color List");
 	my $sides = $ordpage->insert( HBox => name => "panes", pack => { fill => 'both', anchor => 'w', expand => 0, }, );
@@ -433,7 +495,7 @@ sub trySaveGroup {
 	push(@lines,"next=-1,-1");
 	my $fn = $fnwidget->text();
 	$target->insert( Label => text => "Preparing to save file...");
-	print "\n[I] I'll be saving group info into '$fn'";
+	infMes("I'll be saving group info into '$fn'",1);
 	my $i = 0;
 	foreach my $r (@$rows) {
 		print "Row $i: ";
@@ -588,7 +650,7 @@ print ".";
 sub refreshDescList {
 	my ($resettarget,$target,$ar,$sched) = @_;
 	$resettarget->empty(); # clear the box
-	print ")RT: " . $resettarget->name . "...";
+#	print ")RT: " . $resettarget->name . "...";
 	my $odir = (FIO::config('Disk','rotatedir') or "lib"); # pick the directory
 	my @files = FIO::dir2arr($odir,"dsc"); # get the list
 	my $lister = $resettarget->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") ); # make new list box
@@ -651,15 +713,16 @@ sub tryLoadDesc {
 			$descact = 0;
 			my $pi = RItem->new( title => $ti->{title}, text => $ti->{text}, link => $ti->{link}, ); # separate the item from this loop
 			$resettarget->insert( Button => # place button for adding...
-				text => "Add " . Common::shorten($pi->text(),24,10),
+				text => ($sched ? "Use " : "Add ") . Common::shorten($pi->text(),24,10),
 				height => $buttonheight,
 				onClick => sub {
 					my $pr;
-					if ($sched) {
+					if ($sched) { # on the schedule page
 						my $fill = 0; # filler variable
+						$target->empty();
 						my ($error,$server,$img,$lfp) = fetchapic($pi->link,$fill,$stat);
 						return $error if $error;
-						my $viewsize = 100;
+						my $viewsize = 325;
 						my $pic = Prima::Image->new;
 						my $lfn = "$lfp$img";
 						$pic->load($lfn);
@@ -671,7 +734,15 @@ sub tryLoadDesc {
 								pack => {fill => 'none'}, image => $pic);
 							Pfresh();
 						}
-					} else {
+						my $description = $pi->text();
+						$description =~ s/\s+^//; # trim trailing whitespace
+						defined $pi->text() and defined $target->{tunnel}{desced} and $target->{tunnel}{desced}->text($description); # set description text
+						defined $pi->title() and defined $target->{tunnel}{titlent} and $target->{tunnel}{titlent}->text($pi->title()); # set image title
+						my $urlent = $target->insert( InputLine => editable => 0, text => "", width => 300, pack => {fill => 'none', expand => 0 }, );
+						defined $pi->link() and $urlent->text($pi->link());
+						$target->{tunnel}{image} = $urlent;
+						defined $target->{tunnel}{button} and $target->{tunnel}{button}->set(enabled => 1); # ungrey the button so we know we'reusable.
+					} else { # not on the schedule page
 						$pr = labelBox($target,$pi->text(),$pi->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
 						$pr->set( pack => { anchor => 'n', valignment => ta::Top } );
 						$pr->insert( Button => # which places button for removing...
@@ -679,6 +750,7 @@ sub tryLoadDesc {
 							onClick => sub { $pr->destroy(); return 0; }, );
 					}
 				},
+				pack => { fill => 'x', expand => 0, },
 			) unless ($pi->title() eq "Unnamed");
 			push(@$ar,$pi); # store record
 			$ti = RItem->new( title => $2 ); # start new record, in case there are more items in this file
@@ -715,7 +787,8 @@ sub tryLoadDesc {
 					text => "Remove",
 					onClick => sub { $pr->destroy(); return 0; }, );
 			}
-		}
+		},
+		pack => { fill => 'x', expand => 0, },
 	) unless ($ti->title() eq "Unnamed");
 	push(@$ar,$ti) unless ($ti->title() eq "Unnamed"); # store record
 	$resettarget->insert( Button => text => "Pick different file", onClick => sub { refreshDescList($resettarget,$target,$ar); }, );
@@ -807,6 +880,7 @@ sub fetchapic { # fetches an image from the cache, or from the server if it's no
 	my $server = ($2 or "");
 	my $img = ($4 or "");
 	$img =~ s/\?.*//; # we won't want ?download=true or whatever in our filenames.
+	length($img) > 7 or ($img = substr($3,-(7-length($img))-1,(7-length($img))) . "_" . $img); # for cases of 1.png, etc.
 	return -1 if ($server eq "" || $img eq ""); # if we couldn't parse this, we won't even continue.
 	my $thumb = (FIO::config('Net','thumbdir') or "itn");
 	my $lfp = $thumb . "/";
@@ -873,7 +947,7 @@ sub tryLoadInput {
 	}
 	my $outbox = labelBox($resettarget,"Images",'imagebox','V', boxfill => 'both', boxex => 1, labfill => 'none', labex => 0);
 	my $hb = $outbox->insert( HBox => name => "$fn" ); # Left/right panes
-	my $ib = $hb->insert( VBox => name => "Image Port", pack => {fill => 'y', expand => 1, padx => 3, pady => 3,} ); # Top/bottom pane in left pane
+	my $ib = $hb->insert( VBox => name => "Image Port", pack => {fill => 'y', expand => 1, padx => 3, pady => 3,}, width => $viewsize + 10 ); # Top/bottom pane in left pane
 	my $vp; # = $ib->insert( ImageViewer => name => "i$img", zoom => $iz, pack => {fill => 'none', expand => 1, padx => 1, pady => 1,} ); # Image display box
 	my $cap = $ib->insert( Label => text => "(Nothing Showing)\nTo load an image, click its button in the list.", autoHeight => 1, pack => {fill => 'x', expand => 0, padx => 1, pady => 1,} ); # caption label
 	my $lbox = $hb->insert( VBox => name => "Images", pack => {fill => 'both', expand => 1, padx => 0, pady => 0,} ); # box for image rows
@@ -903,6 +977,8 @@ sub tryLoadInput {
 		} else {
 			$row->insert( Label => text => "$img could not be loaded for viewing." );
 		}
+		my $nt = $row->insert( InputLine => width => 50, name => "t of $line", text => "$okey" );
+		$nt->set(onLeave => sub { $$hashr{$okey}{title} = $nt->text; });
 		$row->insert( Label => text => ":");
 		my $desc = $row->insert( InputLine => width => 350, name => "$line", text => "" );
 		$desc->set(onLeave => sub { $$hashr{$okey}{desc} = $desc->text; });
@@ -932,11 +1008,11 @@ sub saveDescs {
 	my $n = length keys %$hr;
 	my @lines = ();
 	my $verbose = FIO::config('Debug','v');
-	$verbose and print "\n[I] Saving $n descriptions to $fn... ";
+	$verbose and infMes("Saving $n descriptions to $fn... ",1);
 	foreach my $ok (sort keys %$hr) {
-		next if (missing($$hr{$ok}{url}) || missing($$hr{$ok}{desc}));
+		next if (missing($$hr{$ok}{url}) || missing($$hr{$ok}{desc}) || missing($$hr{$ok}{title}));
 		print "$ok, ";
-		push(@lines,"item=$ok");
+		push(@lines,"item=$$hr{$ok}{title}");
 		push(@lines,"url=$$hr{$ok}{url}");
 		push(@lines,"desc=$$hr{$ok}{desc}");
 	}

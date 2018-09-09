@@ -12,8 +12,6 @@ RSS Item. Stores information for an item to be published to an RSS feed object.
 sub new {
 	my ($class,%profile) = @_;
 	my $self = {
-# 	dexmod nat deflect notff nottch miscmod speed conscore maxhp init );
-
 		title => ($profile{title} or "Unnamed"),
 		text => ($profile{text} or "Description Missing"),
 		link => ($profile{link} or "about:blank"),
@@ -84,7 +82,8 @@ sub time {
 
 
 sub date {
-	my ($self,$text) = @_;
+	my ($self,$text,$form) = @_;
+	defined $form and $form == 1 and return DateTime::Format::DateParse->parse_datetime($self->get('date'))->ymd();
 	defined $text or return $self->get('date');
 	return $self->set('date',$text);
 }

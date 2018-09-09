@@ -7,6 +7,7 @@ use FIO qw( config );
 use RItem;
 use Common qw( infMes );
 
+#new for castagogue
 =item prepare()
 	Given an RSS feed filename ($fn) and an output (file or STDOUT ($output)), creates an RSS object and cleans out items that have already passed.
 	Returns RSS item for $fn.
@@ -43,7 +44,7 @@ sub prepare {
 			($most,$mid,$least) = ($1,$2,$3);
 			$most = sprintf("%07s",$most);
 			$mid = sprintf("%07s",$mid);
-			print "\n[I] * Found: $most - $mid - $least...";
+			infMes("* Found: $most-$mid-$least...",1);
 		} else{
 			$rawid =~ m/^([0-9a-zA-Z]{7})-([0-9a-zA-Z]{7})-([0-9a-fA-F]{7})$/;
 			($most,$mid,$least) = ($1,$2,$3);
@@ -60,13 +61,13 @@ print "For $numinhex...";
 		FIO::config('Disk','gui1',$most); # save as int
 		FIO::config('Disk','gui2',$mid); # save as int
 		if ($purging && $start < $end) {
-			infMes("Deleting old item from $date.",continues => 1);
+			infMes("Deleting old item from $date.",1);
 			splice(@{$rss->{items}},$itemno,1);
 			print " (" . $#{$rss->{items}} . " left) ";
 		} elsif ($start < $end) {
-			$debug and infMes("Keeping old item from $date.",continues => 1);
+			$debug and infMes("Keeping old item from $date.",1);
 		} else {
-			$debug and infMes("$date is after " . $end->ymd() . ".\n",continues => 1);
+			$debug and infMes("$date is after " . $end->ymd() . ".\n",1);
 		}
 		$itemno++;
     }
@@ -102,25 +103,26 @@ sub getGUID {
 	$v3 = Common::pad($v3,7,"0");
 	$v2 = Common::pad($v2,7,"0");
 	$value = Common::pad($value,7,"0");
-	return "$v3-$v2-$value";
+	return sprintf("%07x-%07x-%07x",$v3,$v2,$value);
 }
 
-#new for castagogue
 =item makeItem()
 	Given an RSS object($r), a description ($desc), a URL ($url), and a publication dateTime ($pdt) (and optionally a category, $cat), creates an item in the RSS object.
 =cut
 sub makeItem {
 	my ($r,$desc,$url,$pdt,$cat,$title,$pub) = @_;
 	my $pds = $pdt->strftime("%a, %d %b %Y %T %z");
-	my $gi = sprintf("%04x",getGUID());
+	my $gi = getGUID();
+	defined $cat or $cat = 'general';
+	(FIO::config('Main','autotag') or 0) and $desc = "$desc\n#$cat"; # add the category as a hashtag
 	$r->add_item(
 		title		=> ("$title" or qq{$pdt->day_name}),
 		link		=> "$url",
 		pubDate		=> ("$pub" or "$pds"),
 		guid		=> "$gi",
-		category	=> (qq{$cat} or "general"),
+		category	=> qq{$cat},
 		description => (qq{$desc} or "A description was not given."),
-	)
+	);
 }
 print ".";
 
@@ -140,9 +142,9 @@ print ".";
 =cut
 sub processDatedFile {
 	my ($fn,$output) = @_;
-	print "\n[I] Reading $fn..";
+	infMes("Reading $fn..",1);
 	$fn = "schedule/$fn";
-	my $v = main::howVerbose(); 
+	my $v = main::howVerbose();
 	if ( $v > 2) { print " $fn"; }
 	my %items;
 	unless ( -e $fn ) { # file does not exist; skipping
@@ -180,6 +182,7 @@ sub processDatedFile {
 				$ti->name($ltitle);
 				$ti->time(sprintf("%04i",$ltime));
 				$ti->category($lcat);
+print $ti->name;
 				$items{$ldate} = [] unless exists $items{$ldate};
 				push(@{$items{$ldate}},$ti); # store record
 				print ".";
@@ -191,7 +194,7 @@ sub processDatedFile {
 }
 
 =item processFile()
-	Given a filename ($fn), a DateTime ($d), opens the text file and looks for certain keywords, whose data will be processed and stored with all tokens replaced with appropriate values.
+	Given a filename ($fn), a DateTime ($d), and a hashref of existing items ($hr) opens the text file and looks for certain keywords, whose data will be processed and stored with all tokens replaced with appropriate values.
 	Optionally, add an output object where status messages should go ($output).
 	Returns array of RItems.
 =cut
@@ -262,8 +265,8 @@ sub processFile {
 					$descact = 0;
 				} elsif ($k eq "last") { # the end of the post record
 					$descact = 0;
-					next if (exists $$hr{$ti->timestamp} && findIn($ti->title,@{$$hr{$ti->timestamp}}));
-					push(@{$$hr{$ti->timestamp}},$ti->title);
+					next if (exists $$hr{$ti->date(undef,1)} && findIn($ti->title,@{$$hr{$ti->date(undef,1)}}));
+					push(@{$$hr{$ti->date(undef,1)}},$ti->title);
 					push(@items,$ti); # store record
 					last if(!defined $2 || $2 eq "1"); # if last item, exit loop
 					print $fn;
@@ -278,6 +281,31 @@ sub processFile {
 	}
 	return @items;
 }
+
+=item addDatedToday()
+	Given an RSS object ($r), a hashref of existing titles ($hr), and an arrayref of items to add ($ar), calls the processor for each item.
+	Optionally, add an output object where status messages should go ($out).
+	returns the RSS object? or any error codes? Haven't decided.
+=cut
+sub addDatedToday {
+	my ($r,$hr,$ar,$d,$out) = @_;
+	if (main::howVerbose() > 0) {
+		print "\nRunning dated objects: ";
+	} else {
+		print "Y";
+	}
+	my @items = @$ar;
+	foreach my $i (@items) { # put items in RSS objects
+		(ref($i) eq "RItem") || next;
+		if (exists $$hr{$i->date(undef,1)} && scalar @{$$hr{$i->date(undef,1)}}) { # if a title list exists,
+			next if (Common::findIn($i->title,@{$$hr{$i->date(undef,1)}}) > -1); # skip this item if its title is present for this date.
+		}
+		push(@{$$hr{$i->date(undef,1)}},$i->title); # otherwise, add it to the list...
+		makeItem($r,$i->text,$i->link,$d,$i->cat,$i->name,$i->timestamp); # and add it to the RSS feed.
+	}
+	return 0;
+}
+print ".";
 
 
 =item processDay()
@@ -326,6 +354,8 @@ sub catalogRSS {
 	my %items;
 	foreach my $i (@{$r->{items}}) {
 		my $ldate = $i->{pubDate};
+		my $d = DateTime::Format::DateParse->parse_datetime( $ldate );
+		$ldate = $d->ymd();
 		$items{$ldate} = [] unless exists $items{$ldate};
 		push(@{$items{$ldate}},$i->{title}); # store record
 	}
@@ -376,11 +406,14 @@ sub processRange {
 	($ds < $dp) && die "I cannot go backward in time. Sorry.\n";
 	infMes("Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":");
 	my %items = catalogRSS($r); # grab item titles to prevent duplication.
-use Data::Dumper; print Dumper \%items;
-	my %dated = processDatedFile("dated.txt",\%items,$out));
+#use Data::Dumper; print Dumper \%items;
+	my %dated = processDatedFile("dated.txt",\%items,$out);
+#print ";;;" . Dumper %dated;
 	while ($dp <= $ds) {
 		processDay($dp,$r,\%items,$out);
-		# TODO: Add items from %dated ($dated{$dp})
+		addDatedToday($r,\%items,$dated{$dp->ymd()},$dp,$out); # TODO: Add items from %dated ($dated{$dp})
+#		print $dp->ymd() . " ... " . Dumper \@{$dated{$dp->ymd()}};
+		
 		$dp = $dp + DateTime::Duration->new( days=> 1 );
 	}
 	return 0;

@@ -111,6 +111,7 @@ sub getOpts {
 		'005' => ['t',"Name of organization",'orgname'],
 		'006' => ['n',"Time Zone Offset (from GMT)",'tz',-12,12,1,6],
 		'007' => ['n',"By default, how many days ahead to post",'eventlead'],
+		'008' => ['c',"Automatically tag post with its RSS category",'autotag'],
 
 		'020' => ['l',"File",'Disk'],
 		'021' => ['t',"Rotational Image Group files live here",'rotatedir'],

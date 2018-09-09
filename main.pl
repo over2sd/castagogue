@@ -6,7 +6,7 @@ use utf8;
 
 # castagogue
 my $PROGNAME = "Castagogue";
-my $version = "0.012a";
+my $version = "0.013a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGNAME v$version is running.";
@@ -101,4 +101,5 @@ $rss->save($outfile);
 unless (FIO::config('Disk','persistentnext')) {
 	print "nextID was " . FIO::cfgrm('Main','nextid',undef); } # reset nextID if we want to get it from the file each time.
 FIO::saveConf();
+print "\nExiting normally.\n";
 1;

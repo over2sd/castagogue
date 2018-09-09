@@ -10,3 +10,4 @@ use utf8;
 # schedule
 
 # add sample schedule files
+# ask questions and write the first rss.xml file.

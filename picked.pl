@@ -1,4 +1,4 @@
-﻿#!/usr/bin/perl
+#!/usr/bin/perl
 use strict;
 use warnings;
 #use diagnostics;
@@ -9,7 +9,7 @@ use utf8;
 ####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
 
 my $PROGRAMNAME = "Castapic";
-my $version = "0.011a";
+my $version = "0.012a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGRAMNAME v$version is running.";
@@ -51,6 +51,7 @@ my $text = $$gui{status};
 PGUI::populateMainWin(undef,$gui,0);
 $text->push("Ready.");
 Options::formatTooltips();
+print "\n";
 Prima->run();
-
+print "Exiting normally\n";
 1;

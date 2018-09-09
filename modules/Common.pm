@@ -182,7 +182,7 @@ sub findIn {
 	}
 	unless (defined $a[$#a] and defined $v) {
 #		print "Found '$v' (" . @a . ")\n";
-		die "FATAL: findIn was not sent a \$SCALAR and an \@ARRAY as required" . lineNo() . "\n";
+		die "FATAL: findIn requires a \$SCALAR and an \@ARRAY (was given '" . $v . "' and '" . @a . "' at " . lineNo() . "\n";
 		return -1;
 	}
 	my $i = 0;
@@ -427,7 +427,8 @@ sub errSpecial {
 print ".";
 
 sub infMes {
-	my ($text,%args) = @_;
+	my ($text,$continue,%args) = @_;
+	defined $continue and $args{continues} = $continue;
 	Common::errorOut('inline',0,color => 1, fatal => 0, string => "\n[I] $text", %args);
 }
 print ".";
