@@ -1261,6 +1261,7 @@ sub createMainWin {
 	my ($t,$l) = ((FIO::config('Main','top') or 30),(FIO::config('Main','left') or 40));
 	$window->place( x => $l, rely => 1, y=> -$t, anchor => "nw");
 	$window->onClose( sub {
+		FIO::writeLines("notes.txt",$windowset{notes},1); # save notes, replacing file.
 		FlexSQL::closeDB() if (FIO::config('DB','FlexSQLisloaded') == 1);
 		my $err = PGK::savePos($window) if (FIO::config('Main','savepos'));
 		Common::errorOut('PGK::savePos',$err) if $err;

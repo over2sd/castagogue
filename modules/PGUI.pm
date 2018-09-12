@@ -77,6 +77,7 @@ sub resetScheduling {
 	my ($args) = @_;
 	my $schpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
 	my $bgcol = $$args[1];
+	my $gui = getGUI();
 	$schpage->empty(); # start with a blank slate
 	my $panes = $schpage->insert( HBox => name => 'splitter',  pack => { fill => 'both', expand => 0 }, );
 	my $lister = $panes->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol),  );
@@ -111,7 +112,10 @@ sub resetScheduling {
 	$tunnel{titlent} = $hbi;
 	$tunnel{desced} = $tbi;
 	$prev->{tunnel} = \%tunnel;
-
+	my $notebox = $panes->insert( Edit => name => "notes", pack => { fill => 'both', expand => 1 }, hint => "This is a good place to store notes about your schedule.", ); # a box for writing notes
+	$notebox->{lines} = $$gui{notes}; # allows the object to save its lines over the lines I'm about to load from the array stored therein
+	$notebox->text(join('
+',@{$$gui{notes}}) ); # Allows us to load the lines from the text file into the editor
 	refreshDescList($lister,$prev,$tar,$sched);
 # Show these: fields for each dated.txt field, calendar for scheduling, time fields, schedule button
 # will this tab be used for both individual schedule items and for weekly schedules? Do I need another tab?
@@ -658,9 +662,9 @@ sub refreshDescList {
 	my $stat = getGUI("status");
 	my $text = "building buttons..";
 	foreach my $f (@files) {
+			$stat->push($text);
 			makeDescButton($lister,$f,$resettarget,$target,$ar,$sched);
 			$text = "$text.";
-			$stat->push($text);
 	}
 	$stat->push("Done. Pick a file.");
 	return 0;
@@ -791,7 +795,7 @@ sub tryLoadDesc {
 		pack => { fill => 'x', expand => 0, },
 	) unless ($ti->title() eq "Unnamed");
 	push(@$ar,$ti) unless ($ti->title() eq "Unnamed"); # store record
-	$resettarget->insert( Button => text => "Pick different file", onClick => sub { refreshDescList($resettarget,$target,$ar); }, );
+	$resettarget->insert( Button => text => "Pick different file", onClick => sub { refreshDescList($resettarget,$target,$ar,$sched); }, );
 	getGUI('status')->push("Done loading $count items.");
 	return 0; # success!
 }

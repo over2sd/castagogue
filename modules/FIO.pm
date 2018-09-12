@@ -135,8 +135,8 @@ print ".";
 sub readFile {
 	my $fh;
 	my ($fn,$stat,$create) = @_;
-	$create and return ();
 	unless (open($fh,"<$fn")) { # open file
+		$create and return ();
 		$stat and $stat->push("\n[E] Error opening file '$fn': $!" );
 		config('Main','fatalerr') && die "I am slain by unopenable file $fn because $!";
 		return ();
