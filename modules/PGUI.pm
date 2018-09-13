@@ -37,10 +37,12 @@ sub schedulePost {
 	my $fn = "schedule/dated.txt";
 	if ($$fields{calent}->text() eq "0000-00-00") { # did you forget to set the date?
 		$stat->push("A valid date is required to schedule a post!");
+		$$fields{calent}->set( backColor => ColorRow::stringToColor("#F00"), onChange => sub { $$fields{calent}->set( backColor => ColorRow::stringToColor("#FFF"), onChange => sub {}, ); }, );
 		return -1;
 	}
 	if ($$fields{catent}->text() eq "category") { # did you forget to set the date?
 		$stat->push("A valid category (even 'general') is required to schedule a post!");
+		$$fields{catent}->set( backColor => ColorRow::stringToColor("#F00"), onChange => sub { $$fields{catent}->set( backColor => ColorRow::stringToColor("#FFF"), onChange => sub {}, ); }, );
 		return -2;
 	}
 	$stat->push("Appending post to $fn...");
@@ -55,7 +57,7 @@ sub schedulePost {
 	$stat->push($err ? "Error when saving: $!" : "Post saved.");
 	delete $$fields{image};
 	$target->empty();
-	$target->insert(Label => text => "Saved $$fields{'title'} to $fn.");
+	$target->insert(Label => text => "Saved $$fields{'title'} to $fn.", backColor => ColorRow::stringToColor("#1f2"), pack => {fill => 'x', expand => 0, }, );
 	$target->insert(Label => text => " ", pack => { fill => 'y', expand => 1, }, );
 	$button->text("Schedule");
 	$button->set( enabled => 1 );
@@ -87,10 +89,8 @@ sub resetScheduling {
 	my $stage = $panes->insert( VBox => name => "stager", pack => { fill => 'both' }, );
 	my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
 	$stage->insert(Label => text => " ", pack => { fill => 'both', expand => 1, }, );
-	my $hb = labelBox($stage,"Title: ",'tbox','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1, );
-	my $hbi = $hb->insert( InputLine => text => "Change Me; I'm used for indexing", width => 300, pack => { alignment => ta::Left, fill => 'x', }, );
-	my $tb = labelBox($stage,"Content: ",'dbox','H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1, );
-	my $tbi = $tb->insert( InputLine => text => "This is a wonderful place to put the final description text.", pack => { fill => 'both' }, width => 400, );
+	my ($hb,$hbi) = labeledRow($stage,"Title: ",( name => 'tbox', contents => [ ["InputLine", text => "Change Me; I'm used for indexing", width => 300, pack => { alignment => ta::Left, fill => 'x', },],], boxfill => 'x', boxex => 0, labfill => 'x', labex => 1, ));
+	my ($tb,$tbi) = labeledRow($stage,"Content: ",( contents => [[InputLine => text => "This is a wonderful place to put the final description text.", pack => { fill => 'both' }, width => 400,]], boxfill => 'x', boxex => 0, labfill => 'x', labex => 1,));
 	my $detbox = $stage->insert( HBox => name => "me" );
 	my $calent = $detbox->insert( InputLine => text => '0000-00-00', name => 'imadate' );
 	my $calbut = $detbox->insert( SpeedButton => name => ('showcal'), onClick => sub {
@@ -147,6 +147,7 @@ sub resetPublishing {
 	my ($args) = @_;
 	my $pubpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
 	my $bgcol = $$args[1];
+	my $gui = getGUI();
 	$pubpage->empty(); # start with a blank slate
 	my $box = $pubpage->insert( VBox => name => "pubpage", backColor =>  PGK::convertColor($bgcol) + 32 );
 	my $ofile = labelBox($box,"Output RSS: ",'fileout','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
@@ -167,6 +168,10 @@ sub resetPublishing {
 # each RItem row should have a button to remove that item.
 # each RItem should have buttons to edit values.
 # svae button to write items to RSS
+	my $notebox = $pubpage->insert( Edit => name => "notes", pack => { fill => 'both', expand => 1 }, hint => "This is a good place to store notes about your schedule.", ); # a box for writing notes
+	$notebox->{lines} = $$gui{notes}; # allows the object to save its lines over the lines I'm about to load from the array stored therein
+	$notebox->text(join('
+',@{$$gui{notes}}) ); # Allows us to load the lines from the text file into the editor
 
 	my $op = labelBox($pubpage,"Publishing page not yet coded.",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
 }

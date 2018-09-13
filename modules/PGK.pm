@@ -5,7 +5,7 @@ print __PACKAGE__;
 
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox Pdie Pwait Pager Pfresh );
+@EXPORT = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox Pdie Pwait Pager Pfresh labeledRow labeledCol );
 use Prima qw(Application Buttons MsgBox FrameSet);
 
 use FIO qw( config );
@@ -1364,6 +1364,32 @@ sub labelBox {
 	}
 	$box->insert( Label => text => "$label", autoHeight => 1, valignment => ta::Middle, alignment => ta::Left, pack => { fill => (defined $args{labfill} ? $args{labfill} : 'x'), expand => (defined $args{labex} ? $args{labex} : 0), }  );
 	return $box;
+}
+print ".";
+
+sub labeledRowCol {
+	my ($parent,$label,$orient,%args) = @_;
+	my $number = time % 1000;
+	my $name = ($args{name} or "${orient}Box $number");
+	my $rowcol = labelBox($parent,$label,$name,$orient,%args);
+	my @values = ($rowcol,);
+	foreach my $ob (@{$args{contents}}) {
+		my $child = $rowcol->insert(@$ob);
+		push(@values,$child);
+	}
+	return @values;
+}
+print ".";
+
+sub labeledRow {
+	my ($parent,$label,%args) = @_;
+	return labeledRowCol($parent,$label,'H',%args);
+}
+print ".";
+
+sub labeledCol {
+	my ($parent,$label,%args) = @_;
+	return labeledRowCol($parent,$label,'H',%args);
 }
 print ".";
 
