@@ -64,6 +64,7 @@ sub expandMask { # returns array
 }
 
 sub fmod { # useful for working with fractional values, since x%y may return int.
+	use POSIX qw( floor );
 	my ($x,$y,$both) = @_;
 	errSpecial("db0e") unless $y; # death by zero division
 	my $q = floor($x/$y);

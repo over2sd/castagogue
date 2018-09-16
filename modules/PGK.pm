@@ -979,7 +979,7 @@ Page set object with a means to switch between them.
 
 =head3 Usage
 
- my $pages = $parent->insert( Pager => name => 'pager' );
+ my $pages = $parent->insert( Pager => name => 'pager', control => 'list' );
  $pages->build('page1','page2','page3');
  
 =head3 Methods
@@ -998,6 +998,7 @@ sub profile_default {
 		tabs => [], # texts for selection
 		order => {}, # value/page pairs
 		panels => undef, # container for panels
+		control => 'list', # list control
 	);
 	@$def{keys %prf} = values %prf;
 	return $def;
@@ -1014,6 +1015,7 @@ sub init {
 	foreach (qw( order selector )) {
 		$self->{$_} = {};
 	}
+	$self->{control} = 'list';
 #	$self->{cellMargin} = 5;
 	my %profile = $self-> SUPER::init(@_);	
 	return %profile;
@@ -1031,7 +1033,17 @@ sub build {
 	unless (scalar @{ $self->{tabs} } ) {
 		print "[E] You cannot build this without any tabs!\n";
 		return -1;
-	} else { # build row for dropbox
+	} elsif ($self->{control} eq "buttons") {
+		my $topbot = $self->SUPER::insert( VBox => name => "htov", pack => { fill => 'both', expand => 1, } );
+		$self->{panels} = $topbot->insert( VBoxE => name => 'panelholder', pack => { fill => 'both', expand => 1, } );
+		$self->{selector} = $topbot->insert( HBox => pack => { fill => 'y', expand => 0, padx => 5}, editProfile => {visible => 0});
+		# connect each page to a value in the dropbox:
+		my ($starter,$upper,$downer,$ender);
+		$starter = $self->{selector}->insert( Button => text => "|<", height => 28, onClick => sub { $self->switchToPanel($self->{tabs}[0]); ($self->{index} == $self->pageCount(-1)) and $upper->hide() or $upper->show(); ($self->{index} == 0) and $ender->hide() or $ender->show(); }, );
+		$downer = $self->{selector}->insert( Button => text => "<", height => 28, onClick => sub { $self->adjacent("down"); ($self->{index} == $self->pageCount(-1)) and $upper->hide() or $upper->show(); ($self->{index} == 0) and $ender->hide() or $ender->show(); }, );
+		$upper = $self->{selector}->insert( Button => text => ">", height => 28, onClick => sub { $self->adjacent("down"); ($self->{index} == 0) and $downer->hide() or $downer->show(); ($self->{index} == $self->pageCount(-1)) and $starter->hide() or $starter->show(); }, );
+		$ender = $self->{selector}->insert( Button => text => ">|", height => 28, onClick => sub { $self->switchToPanel($self->{tabs}[-1]); ($self->{index} == 0) and $downer->hide() or $downer->show(); ($self->{index} == $self->pageCount(-1)) and $starter->hide() or $starter->show(); }, );
+	} else { # build row for dropbox (control = "list")
 		$self->{selector} = $self->SUPER::insert( ComboBox => style => cs::Simple, text => $self->{tabs}[0], items => $self->{tabs}, pack => { fill => 'y', expand => 0, padx => 5}, editProfile => {visible => 0});
 		$self->{panels} = $self->SUPER::insert( VBoxE => name => 'panelholder', pack => { fill => 'both', expand => 1, } );
 		# connect each page to a value in the dropbox:
@@ -1041,6 +1053,35 @@ sub build {
 		$self->{order}{$tabs[$_]} = $_; # build panel for each page in the tablist
 #print "$tabs[$_]:$self->{order}{$tabs[$_]}\n";
 	}
+}
+
+sub control {
+	my ($self,$value) = @_;
+	$self->{control} = $value if defined $value;
+	return $self->{control};
+}
+
+sub adjacent {
+	my ($self,$dir) = @_;
+	my $index = ($self->{index} or 0);
+	if ($dir =~/[-1|down|d]/) {
+		$index = $self->pageCount() if $index <= 0;
+		$index--;
+	} elsif ($dir =~ /[1|up|u]/) {
+		$index = -1 if $index >= $self->pagecount(-1);
+		$index++;
+	} else {
+		warn "\n[W] An invalid direction was given to Pager::adjacent(): '$dir'";
+		return;
+	}
+	$self->switchToPanel($self->{tabs}[$index]);
+	$self->{index} = $index;
+}
+
+sub pageCount {
+	my ($self,$adjustment) = @_;
+	return $self->{pagecount} + ($adjustment or 0); # internal page count
+#	return scalar @{$self->{tabs}} + ($adjustment or 0); # length of tabs array
 }
 
 sub switchToPanel {
@@ -1053,6 +1094,7 @@ sub switchToPanel {
 	}
 	$self->{pages}[$index]->bring_to_front() if defined $self->{pages}[$index]; # bring it to the front so the user can interact with it
 	$self->{pages}[$index]->{switchaction}($self->{pages}[$index]->{switchargs}) if defined $self->{pages}[$index]{switchaction}; # run whatever the user has defined as the "on switch to this page" action.
+	$self->{index} = $index;
 	return 0;
 }
 

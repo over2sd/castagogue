@@ -6,7 +6,7 @@ use utf8;
 
 # castagogue
 my $PROGNAME = "Castagogue";
-my $version = "0.013a";
+my $version = "0.014a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGNAME v$version is running.";

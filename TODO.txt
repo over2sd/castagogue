@@ -8,3 +8,4 @@ Publish RSS file.
 Fix error that results in failure to delete some old items.
 Make sure I didn't reinvent the wheel with my row processing (might be better to have used RRGroup).
 figure out why my attempt to check titles before adding RSS objects didn't work.
+Try Pager, VBoxE, etc, for pagify function.

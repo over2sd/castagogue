@@ -926,6 +926,26 @@ sub showapic {
 }
 print ".";
 
+sub pagifyGroup {
+	my ($target,$count,$pageof,$scale,$obtype,%args) = @_;
+	my (@book,@pagelist); # array for the pages
+	use POSIX qw( floor ); # to get the int value
+	my $pages = floor($count / $pageof); # Divide and discard remainder
+	return ($target,@book) unless ($pages); # if not enough for paging, just use the target.
+	foreach my $i (0..$pages) {
+		push(@pagelist,"page$i");
+	}
+	my $newtarget = $target->insert( Pager => name => "pager", pack => { fill => 'both', expand => 1, }, minHeight => $scale, minWidth => 200, );
+	$newtarget->control("buttons");
+	$newtarget->build(@pagelist);
+	foreach my $i (0..$pages) {
+		my $child = $newtarget->insert_to_page($i,$obtype => name => "page$i", %args);
+		push(@book,$child);
+	}
+	return ($newtarget,@book);
+}
+print ".";
+
 =item tryLoadInput TARGET FILE PAUSEOBJ HASH SIZEOBJ
 
 Given a reset TARGET widget, a FILE name, a PAUSEOBJect containing a delay in the text field, a HASH in which to store 
@@ -954,17 +974,31 @@ sub tryLoadInput {
 	} elsif ($#them == 1) {
 		$stat->push("One line found in file!");
 	}
-	my $outbox = labelBox($resettarget,"Images",'imagebox','V', boxfill => 'both', boxex => 1, labfill => 'none', labex => 0);
-	my $hb = $outbox->insert( HBox => name => "$fn" ); # Left/right panes
+	my $outbox = labelBox($resettarget,"Images",'imagebox','V', boxfill => 'both', boxex => 0, labfill => 'none', labex => 0);
+	my $hb = $outbox->insert( HBox => name => "$fn", pack => {fill => 'x', expand => 1} ); # Left/right panes
 	my $ib = $hb->insert( VBox => name => "Image Port", pack => {fill => 'y', expand => 1, padx => 3, pady => 3,}, width => $viewsize + 10 ); # Top/bottom pane in left pane
 	my $vp; # = $ib->insert( ImageViewer => name => "i$img", zoom => $iz, pack => {fill => 'none', expand => 1, padx => 1, pady => 1,} ); # Image display box
 	my $cap = $ib->insert( Label => text => "(Nothing Showing)\nTo load an image, click its button in the list.", autoHeight => 1, pack => {fill => 'x', expand => 0, padx => 1, pady => 1,} ); # caption label
-	my $lbox = $hb->insert( VBox => name => "Images", pack => {fill => 'both', expand => 1, padx => 0, pady => 0,} ); # box for image rows
+	my $lbox = $hb->insert( VBox => name => "Images", pack => {fill => 'both', expand => 1, padx => 0, pady => 0, minHeight => $viewsize + 75, } ); # box for image rows
+	my $groupsof = 10;
+#	my ($pager,@book) = pagifyGroup($lbox,scalar @them,$groupsof,$viewsize,"VBox");
+	my $page = $lbox;
+	if (scalar @them > $groupsof) {
+#		$page = $book[0];
+	}
+	my $pagenumber = 0;
+	my $pageitem = 0;
 	foreach my $line (@them) {
+		$pageitem++;
+#		if ($pageitem > $groupsof) { # This will only proc if we have more than 10 items, anyway.
+#			$pageitem -= $groupsof;
+#			$pagenumber++;
+#			$page = $book[$pagenumber];
+#		}
 		Pfresh();
-		my ($error,$server,$img,$lfp) = fetchapic($line,\$hitserver,$stat,$lbox);
+		my ($error,$server,$img,$lfp) = fetchapic($line,\$hitserver,$stat,$page);
 		return $error if $error;
-		my $row = $lbox->insert( HBox => name => $img);
+		my $row = $page->insert( HBox => name => $img);
 		$orderkey++; # new order key for each image found.
 		my $okey = sprintf("%04d",$orderkey);# Friendly name, in string format for use as hash key for keeping image order
 		$$hashr{$okey} = {}; # make a new empty hash for each image
@@ -999,8 +1033,8 @@ sub tryLoadInput {
 			$hitserver = 0;
 		}
 	}
-	my $of = $outbox->insert( InputLine => text => "prayers.dsc", pack => { fill => 'x', expand => 1, },);
-	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 1, }, onClick => sub { my $ofn = $of->text; $ofn =~ s/\..+$//; $ofn = "$ofn.dsc"; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn."); $resettarget->insert( Label => text => "Your file has been saved.", pack => {fill => 'both', expand => 1}); $resettarget->insert( Button => text => "Continue to Grouping tab", onClick => sub { getGUI('pager')->switchToPanel("Grouping"); } ); $resettarget->insert( Label => text => scalar %$hashr . " images.", pack => {fill => 'both', expand => 1}); });
+	my $of = $outbox->insert( InputLine => text => "prayers.dsc", pack => { fill => 'x', expand => 0, },);
+	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 0, }, onClick => sub { my $ofn = $of->text; $ofn =~ s/\..+$//; $ofn = "$ofn.dsc"; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn."); $resettarget->insert( Label => text => "Your file has been saved.", pack => {fill => 'both', expand => 1}); $resettarget->insert( Button => text => "Continue to Grouping tab", onClick => sub { getGUI('pager')->switchToPanel("Grouping"); } ); $resettarget->insert( Label => text => scalar %$hashr . " images.", pack => {fill => 'both', expand => 1}); });
 	$stat->push("Done.");
 	return 0; # success!
 }

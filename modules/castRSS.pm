@@ -98,8 +98,8 @@ sub getGUID {
 		$v2++;
 	}
 	FIO::config('Main','nextid',$value + 1);
-	FIO::config('Disk','gui1',$v2);
-	FIO::config('Disk','gui2',$v3);
+	FIO::config('Disk','gui1',$v3);
+	FIO::config('Disk','gui2',$v2);
 	$v3 = Common::pad($v3,7,"0");
 	$v2 = Common::pad($v2,7,"0");
 	$value = Common::pad($value,7,"0");
@@ -111,7 +111,8 @@ sub getGUID {
 =cut
 sub makeItem {
 	my ($r,$desc,$url,$pdt,$cat,$title,$pub) = @_;
-	my $pds = $pdt->strftime("%a, %d %b %Y %T %z");
+	my $pds = $pdt->strftime("%a, %d %b %Y %T ");
+	$pds = $pds . Sui::getTZ();
 	my $gi = getGUID();
 	defined $cat or $cat = 'general';
 	(FIO::config('Main','autotag') or 0) and $desc = "$desc\n#$cat"; # add the category as a hashtag

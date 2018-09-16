@@ -79,6 +79,7 @@ print ".";
 
 sub getTZ {
 	my $t = FIO::config('Main','tz'); # pull timezone from config
+	return $t unless ($t + 1 eq 1 + $t); # pass it back as-is if it doesn't work in arithmetic calculations; it's probably a string.
 	my $s = ($t<0?"-":"+"); # save the sign
 	$t = ($t<0?-100:100) * $t; # convert offset to hours
 	return sprintf("%s%04i",$s,$t); # return TZ offset as nice string.
