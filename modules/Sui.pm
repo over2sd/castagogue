@@ -129,6 +129,7 @@ sub getOpts {
 		'041' => ['x',"Rule color: ",'rulecolor',"#003"],
 		'042' => ['n',"How many rows per column in file lists?",'filerows',10,3,30,1,5],
 		'043' => ['t',"Color codes for gradient (comma separated)",'gradient'],
+		'044' => ['c',"Preview RSS feed before saving",'preview'],
 
 		'100' => ['l',"Network",'Net'],
 		'101' => ['c',"Save bandwidth by saving image thumbnails",'savethumbs'],

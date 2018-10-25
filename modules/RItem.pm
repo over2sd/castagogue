@@ -38,21 +38,21 @@ sub set {
 }
 
 sub text {
-	my ($self,$text) = @_;
+	my ($self,$text,$zealous) = @_;
 	defined $text or return $self->get('text');
-	return $self->set('text',Common::RSSclean($text));
+	return $self->set('text',Common::RSSclean($text,$zealous));
 }
 
 sub name {
 	my ($self,$text) = @_;
 	defined $text or return $self->get('title');
-	return $self->set('title',Common::RSSclean($text));
+	return $self->set('title',Common::RSSclean($text,$zealous));
 }
 
 sub title {
 	my ($self,$text) = @_;
 	defined $text or return $self->get('title');
-	return $self->set('title',Common::RSSclean($text));
+	return $self->set('title',Common::RSSclean($text,$zealous));
 }
 
 sub link {
@@ -64,13 +64,13 @@ sub link {
 sub cat {
 	my ($self,$text) = @_;
 	defined $text or return $self->get('cat');
-	return $self->set('cat',Common::RSSclean($text));
+	return $self->set('cat',Common::RSSclean($text,$zealous));
 }
 
 sub category {
 	my ($self,$text) = @_;
 	defined $text or return $self->get('cat');
-	return $self->set('cat',Common::RSSclean($text));
+	return $self->set('cat',Common::RSSclean($text,$zealous));
 }
 
 sub time {

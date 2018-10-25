@@ -27,8 +27,12 @@ sub push {
 	my ($self,$text) = @_;
 	print "$text";
 }
-print ".";
 
+sub append {
+	my ($self,$text) = @_;
+	print "$text";
+}
+print ".";
 
 package NoGUI;
 

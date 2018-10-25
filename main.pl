@@ -6,7 +6,7 @@ use utf8;
 
 # castagogue
 my $PROGNAME = "Castagogue";
-my $version = "0.014a";
+my $version = "0.015a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGNAME v$version is running.";
@@ -52,6 +52,11 @@ if ($helpme) {
 	exit(0);
 }
 
+$conclude =~/([0-9]{4})-?([0-9]{2})-?([0-9]{2})/;
+if ( !defined $1 || !defined $2 || !defined $3) { die "\nI could not parse $conclude for some reason as a date.\n" }
+$begin =~/([0-9]{4})-?([0-9]{2})-?([0-9]{2})/;
+if ( !defined $1 || !defined $2 || !defined $3) { die "\nI could not parse $begin for some reason as a date.\n" }
+
 use lib "./modules/";
 print "\n[I] Loading modules...";
 
@@ -66,20 +71,6 @@ if ($confme) {
 	NoGUI::callOptBox($confme);
 }
 
-# Proof of concept for the Random Rotation Groups objects
-# Not for production.
-
-my $group = RRGroup->new(order => "mixed");
-my ($index,$length) = $group->add(0,{name => "Tom Swift", age => 32},{name => "Harry Houdini", age => 27},{name => "John Smith", address => "1 Any St."});
-#print "Put $length items at index $index of row 0.\n";
-($index,$length) = $group->add(1,{place => "Boston", day => 32},{west => "East", up => "down"});
-#print "Put $length items at index $index of row 1.\n";
-($index,$length) = $group->add(0,{alf => "bet"});
-#print "Put $length items at index $index of row 0.\n";
-my $i = $group->item(0,1);
-print "Contains " . $group->rows() . " rows. The first row contains " . $group->items(0) . " items. Second item in the row: " . $$i{name} . "=" . $$i{age} . "!\n";
-### End of test code ###
-
 FIO::loadConf($conffilename);
 FIO::config('Debug','v',howVerbose());
 FIO::config('Main','nextid',$nextid);
@@ -91,6 +82,7 @@ foreach (Sui::getDefaults()) {
 #my $out = openOutfile($outfile);
 my $mainwindow = "placeholder";
 my $out = StatusBar->new(owner => $mainwindow)->prepare();
+
 my $rss = castRSS::prepare($rssfile,$out);
 #use Data::Dumper;
 #print $rss->as_string;

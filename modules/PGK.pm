@@ -534,6 +534,13 @@ sub push {
 	$self->text($text);
 	$self->repaint();
 }
+
+sub append {
+	my ($self,$text) = @_;
+	my $old = $self->text();
+	$self->text($old . $text);
+	$self->repaint();
+}
 print ".";
 
 package Table;

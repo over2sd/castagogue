@@ -31,6 +31,77 @@ package PGUI;
 
 my @openfiles = [];
 
+sub saveItAsIs {
+	my ($rss,$ofn,$output,$target,$bgcol) = @_;
+	($rss->save($ofn) ? $output->push("$ofn saved.") : $output->push("$ofn could not be saved."));
+	unless (FIO::config('Disk','persistentnext')) { print "nextID was " . FIO::cfgrm('Main','nextid',undef); } # reset nextID if we want to get it from the file each time.
+	FIO::saveConf();
+	$target->insert( Button => text => "Continue", onClick => sub { resetPublishing([$target,$bgcol]); } );
+}
+
+sub toRSSfromGUI {
+	my ($target,$inf,$outf,$dfrom,$dto,$nextb,$victim1,$victim2,$bgcol) = @_;
+	my $process = "process an RSS feed";
+	my $ifn = $inf->text();
+	my $ofn = $outf->text();
+	my $start = $dfrom->text();
+	my $end = $dto->text();
+	FIO::config('Disk','template',$ifn);
+	carpWithout($ifn,$process,"specify an input filename") and return;
+	carpWithout($ofn,$process,"specify a target filename") and return;
+	carpWithout($start,$process,"choose a starting date") and return;
+	carpWithout($end,$process,"choose an ending date") and return;
+# TODO: Check for valid files
+	print "Processing RSS feed out of $ifn into $ofn from $start to $end with ID of " . (defined $nextb and defined $nextb->value() ? $nextb->value() : "" ) . ".\n";
+	my $idsuggest = (defined $nextb->value() ? $nextb->value() : FIO::config('Main','nextid'));
+	FIO::config('Main','nextid',$idsuggest);
+	$victim1->destroy();
+	$victim2->destroy();
+	my $output = $target->insert( Edit => text => "", pack => { fill => 'both', expand => 1, } );
+	Pfresh();
+	sub Prima::Edit::push {
+		my ($self,$text) = @_;
+		my $lines = $self->{lines};
+		push(@$lines,"
+$text");
+		Pfresh();
+	}
+	sub Prima::Edit::append {
+		my ($self,$text) = @_;
+		my $lines = $self->{lines};
+		my $final = $$lines[-1];
+		$final = $final . $text;
+		$$lines[-1] = $final;
+		Pfresh();
+	}
+	require castRSS;
+	Pfresh();
+	my $status = getGUI('status');
+	my $rss = castRSS::prepare($ifn,$output,1);
+	if ($start eq "0000-00-00") { $start = "today"; }
+	if ($end eq "0000-00-00") { $end = "tomorrow"; }
+	Pfresh();
+	my $error = castRSS::processRange($rss,$start,$end,$output,1);
+	$output->push("Now contains " . $#{$rss->{items}} . " items...");
+#print $rss->as_string;
+	if (FIO::config('UI','preview')) {
+		$output->push("Loading items for review (see below).");
+		Pfresh();
+		my $review = $target->insert( VBox => name => 'review', pack => { fill => 'both', expand => 1 });# VBox to hold RItems
+		$review->insert( Label => text => "Reviewing RSS feed is not yet coded. Sorry." );
+# each existing RSS item will be loaded, given a different background color than generated items.
+# each RItem row should have a button to remove that item.
+# each RItem should have buttons to edit values.
+# svae button to write items to RSS
+		$target->insert( Button => text => "Save", onClick => sub { $_[0]->destroy(); saveItAsIs($rss,$ofn,$output,$target,$bgcol); } );
+		Pfresh();
+	} else {
+		Pfresh();
+		saveItAsIs($rss,$ofn,$output,$target,$bgcol);
+	}
+}
+print ".";
+
 sub schedulePost {
 	my ($button,$target,$fields) = @_;
 	my $stat = getGUI('status');
@@ -57,7 +128,8 @@ sub schedulePost {
 	$stat->push($err ? "Error when saving: $!" : "Post saved.");
 	delete $$fields{image};
 	$target->empty();
-	$target->insert(Label => text => "Saved $$fields{'title'} to $fn.", backColor => ColorRow::stringToColor("#1f2"), pack => {fill => 'x', expand => 0, }, );
+	my $titlestring = $$fields{titlent}->text();
+	$target->insert(Label => text => "Saved $titlestring to $fn.", backColor => ColorRow::stringToColor("#1f2"), pack => {fill => 'x', expand => 0, }, );
 	$target->insert(Label => text => " ", pack => { fill => 'y', expand => 1, }, );
 	$button->text("Schedule");
 	$button->set( enabled => 1 );
@@ -155,25 +227,19 @@ sub resetPublishing {
 	my $ofn = $ofile->insert( InputLine => text => "rssnew.xml");
 	my $ifile = labelBox($box,"Existing RSS",'filein','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0); # RSS template filename
 	$ifile->set(backColor => PGK::convertColor($bgcol));
-	my $ifn = $ifile->insert( InputLine => text => "rss.xml");
+	my $ifn = $ifile->insert( InputLine => text => (FIO::config('Disk','template') or "rss.xml"));
 	my $datebox = $box->insert( HBox => name => "dates", backColor =>  PGK::convertColor($bgcol) + 16 );
 	my $datefrom = PGK::insertDateWidget($datebox,undef,{ label => "From ", bgcol => $bgcol, }); # start date
 	my $dateto = PGK::insertDateWidget($datebox,undef,{label => " to ", bgcol => $bgcol, }); # end date
 	my $nextbox = labelBox($box,"Next ID",'nextid','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
 	$nextbox->set(backColor => PGK::convertColor($bgcol));
 	my $nextid = $nextbox->insert( SpinEdit => name => 'nextid', max => 9999999, min => 0, step => 20, value => (FIO::config('Main','nextid') or 1)); # a spinner for the next ID
-	$box->insert( Button => text => "Prepare...", onClick => sub { devHelp(getGUI('mainWin'),"Preparing RSS feeds"); }, );
-# VBox to hold RItems
-# each existing RSS item will be loaded, given a different background color than generated items.
-# each RItem row should have a button to remove that item.
-# each RItem should have buttons to edit values.
-# svae button to write items to RSS
-	my $notebox = $pubpage->insert( Edit => name => "notes", pack => { fill => 'both', expand => 1 }, hint => "This is a good place to store notes about your schedule.", ); # a box for writing notes
+	my ($pbut,$notebox);
+	$pbut = $box->insert( Button => text => "Prepare...", onClick => sub { toRSSfromGUI($pubpage,$ifn,$ofn,$datefrom,$dateto,$nextid,$box,$notebox,$bgcol); }, );
+	$notebox = $pubpage->insert( Edit => name => "notes", pack => { fill => 'both', expand => 1 }, hint => "This is a good place to store notes about your schedule.", ); # a box for writing notes
 	$notebox->{lines} = $$gui{notes}; # allows the object to save its lines over the lines I'm about to load from the array stored therein
 	$notebox->text(join('
 ',@{$$gui{notes}}) ); # Allows us to load the lines from the text file into the editor
-
-	my $op = labelBox($pubpage,"Publishing page not yet coded.",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
 }
 print ".";
 
@@ -722,7 +788,7 @@ sub tryLoadDesc {
 			$descact = 0;
 			my $pi = RItem->new( title => $ti->{title}, text => $ti->{text}, link => $ti->{link}, ); # separate the item from this loop
 			$resettarget->insert( Button => # place button for adding...
-				text => ($sched ? "Use " : "Add ") . Common::shorten($pi->text(),24,10),
+				text => ($sched ? "Use " : "Add ") . Common::shorten($pi->title(),24,10),
 				height => $buttonheight,
 				onClick => sub {
 					my $pr;
@@ -769,15 +835,16 @@ sub tryLoadDesc {
 #defined $debug and print "\n $k = $2...";
 	}
 	$resettarget->insert( Button => # place button for adding... one final button.
-		text => "Add " . Common::shorten($ti->text(),24,10),
+		text => "Add " . Common::shorten($ti->title(),24,10),
 		height => $buttonheight,
 		onClick => sub {
 			my $pr;
 			if ($sched) {
 				my $fill = 0; # filler variable
+				$target->empty();
 				my ($error,$server,$img,$lfp) = fetchapic($ti->link,$fill,$stat);
 				return $error if $error;
-				my $viewsize = 100;
+				my $viewsize = 325;
 				my $pic = Prima::Image->new;
 				my $lfn = "$lfp$img";
 				$pic->load($lfn);
@@ -789,6 +856,14 @@ sub tryLoadDesc {
 						pack => {fill => 'none'}, image => $pic);
 					Pfresh();
 				}
+				my $description = $ti->text();
+				$description =~ s/\s+^//; # trim trailing whitespace
+				defined $ti->text() and defined $target->{tunnel}{desced} and $target->{tunnel}{desced}->text($description); # set description text
+				defined $ti->title() and defined $target->{tunnel}{titlent} and $target->{tunnel}{titlent}->text($ti->title()); # set image title
+				my $urlent = $target->insert( InputLine => editable => 0, text => "", width => 300, pack => {fill => 'none', expand => 0 }, );
+				defined $ti->link() and $urlent->text($ti->link());
+				$target->{tunnel}{image} = $urlent;
+				defined $target->{tunnel}{button} and $target->{tunnel}{button}->set(enabled => 1); # ungrey the button so we know we'reusable.
 			} else {
 				$pr = labelBox($target,$ti->text(),$ti->title(),'H', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
 				$pr->set( pack => { anchor => 'n', valignment => ta::Top } );
@@ -889,18 +964,26 @@ sub fetchapic { # fetches an image from the cache, or from the server if it's no
 	my $server = ($2 or "");
 	my $img = ($4 or "");
 	$img =~ s/\?.*//; # we won't want ?download=true or whatever in our filenames.
-	length($img) > 7 or ($img = substr($3,-(7-length($img))-1,(7-length($img))) . "_" . $img); # for cases of 1.png, etc.
+	my $serv = "";
+	unless (defined $3) {
+		$server =~ /[\w-]+\.([\w-]+)\.\w+\/|([\w-]+)\.\w+\//; # try to grab the domain name...
+		$serv = ($1 or $2 or "unkn");
+	}
+	my $dir = ($3 or substr($serv,-4,4)); # try to get the directory, or else the last four characters of the server domain.
+	length($img) > 7 or ($img = substr($dir,-(7-length($img))-1,(7-length($img))) . "_" . $img); # for cases of 1.png, etc.
 	return -1 if ($server eq "" || $img eq ""); # if we couldn't parse this, we won't even continue.
 	my $thumb = (FIO::config('Net','thumbdir') or "itn");
 	my $lfp = $thumb . "/";
 	unless (-e $lfp . $img && -f _ && -r _) {
 		$$hitserver = 1;
 		$stat->push("Trying to fetch $line ($img)");
+		Pfresh();
 #		print("Trying to fetch $line ($img) to $lfp");
 		my $failure = FIO::Webget($line,"$lfp$img");# get image from server here
 		$failure and defined $target and $target->insert( Label => name => "$img", text => "$img could not be retrieved from server $2.");
 	} else {
 		$stat->push("Loading image $img from cache");
+		Pfresh();
 	}
 	return (0,$server,$img,$lfp);
 }
@@ -1034,7 +1117,7 @@ sub tryLoadInput {
 		}
 	}
 	my $of = $outbox->insert( InputLine => text => "prayers.dsc", pack => { fill => 'x', expand => 0, },);
-	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 0, }, onClick => sub { my $ofn = $of->text; $ofn =~ s/\..+$//; $ofn = "$ofn.dsc"; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn."); $resettarget->insert( Label => text => "Your file has been saved.", pack => {fill => 'both', expand => 1}); $resettarget->insert( Button => text => "Continue to Grouping tab", onClick => sub { getGUI('pager')->switchToPanel("Grouping"); } ); $resettarget->insert( Label => text => scalar %$hashr . " images.", pack => {fill => 'both', expand => 1}); });
+	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 0, }, onClick => sub { my $ofn = $of->text; $ofn =~ s/\..+$//; $ofn = "$ofn.dsc"; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn."); $resettarget->insert( Label => text => "Your file has been saved.", pack => {fill => 'both', expand => 1}); $resettarget->insert( Button => text => "Continue to Grouping tab", onClick => sub { getGUI('pager')->switchToPanel("Grouping"); } ); $resettarget->insert( Button => text => "Continue to Scheduling tab", onClick => sub { getGUI('pager')->switchToPanel("Scheduling"); } ); $resettarget->insert( Label => text => scalar %$hashr . " images.", pack => {fill => 'both', expand => 1}); });
 	$stat->push("Done.");
 	return 0; # success!
 }
@@ -1165,43 +1248,6 @@ sub populateMainWin {
 		pack => { fill => 'both', },
 	);
 	$pager->setSwitchAction("Publishing",\&resetPublishing,$pubpage,$color); # refresh this page whenever we switch to it
-
-	my $pp = labelBox($pubpage,"Publishing page not yet coded.",'r','H', boxfill => 'both', boxex => 1, labfill => 'x', labex => 1);
-	$pp->set(backColor => PGK::convertColor($color));
-	$color = Common::getColors(18,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 18", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(2,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 2", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(19,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 19", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(20,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 20", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(5,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 5", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(6,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 6", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(7,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 7", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(8,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 8", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(9,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 9", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(10,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 10", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(21,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 21", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(12,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 12", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(13,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 13", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(14,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 14", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(22,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 22", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(23,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 23", backColor => ColorRow::stringToColor($color));
-	$color = Common::getColors(24,1,1);
-	$pubpage->insert( Label => text => "Now is the time for all good men... 24", backColor => ColorRow::stringToColor($color));
 
 	$pager->switchToPanel("Describing");
 	$$gui{pager} = $pager;

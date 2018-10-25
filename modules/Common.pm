@@ -405,15 +405,16 @@ sub errorOut {
 	my $nl = ($error =~ m/^\n/ ? 1 : 0); # allow string to begin with newline
 	if ($error =~ m/^\n?\[E\]/) { # error
 		$color = ($color ? 1 : 0);
-		($fatal ? die errColor($error,$color,$nl) : warn errColor($error,$color,$nl));
+		($fatal ? die errColor($error,$color,$nl,$args{gobj}) : warn errColor($error,$color,$nl,$args{gobj}));
 	} elsif ($error =~ m/^\n?\[W\]/) { # warning
 		$color = ($color ? 3 : 0);
-		($fatal ? warn errColor($error,$color,$nl) : print errColor($error,$color,$nl));
+		($fatal ? warn errColor($error,$color,$nl,$args{gobj}) : print errColor($error,$color,$nl,$args{gobj}));
 	} elsif ($error =~ m/^\n?\[I\]/) { # information
 		$color = ($color ? 2 : 0);
 		my $lf = (($args{continues} or 0) ? "" : "\n");
-		print errColor($error . $lf,$color,$nl);
+		print errColor($error . $lf,$color,$nl,$args{gobj});
 	} else { # unformatted (malformed) error
+		defined $args{gobj} and $args{gobj}->push($error) and return;
 		print $error;
 	}
 }
@@ -435,12 +436,15 @@ sub infMes {
 print ".";
 
 sub errColor {
-	my ($string,$color,$nl) = @_;
-	return $string unless $color; # send back uncolored
-	# TODO: check for numeric value and use getColorsbyName if not numeric
+	my ($string,$color,$nl,$gobj) = @_;
 	my ($col,$base) = (getColors($color),getColorsbyName('base'));
 	my $colstring = substr($string,0,1 + $nl) . $col . substr($string,1 + $nl,1) . $base . substr($string,2 + $nl);
-	return $colstring;
+	if (defined $gobj) {
+		$string = substr($string,1);
+		$gobj->push($string) or $gobj->text($string);
+		return ""; # we just printed it to the GUI object; no need to print it.
+	}
+	return ($color ? $colstring : $string);
 }
 print ".";
 
@@ -753,9 +757,9 @@ print ".";
 	Returns altered input.
 =cut
 sub RSSclean {
-my $in = shift;
+my ($in,$zealous) = @_;
 	$in =~ s/\015\012?/\012/g; # CR or CRLF to LF
-	$in =~ s/&(?!(?:[a-zA-Z0-9]+|#\d+);)/&#x26;/g; # Lonely Ampersand
+	$in =~ s/&(?!(?:[a-zA-Z0-9]+|#\d+);)/&#x26;/g unless ($zealous); # Lonely Ampersand
 	$in =~ s/(#x26;){2}/#x26;/g; # Too much ampersand processing
 	return $in;
 }

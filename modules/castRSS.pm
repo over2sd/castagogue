@@ -16,7 +16,7 @@ sub prepare {
 	$|++;
 	require XML::RSS;
 	
-	my ($fn,$output) = @_;
+	my ($fn,$output,$isgui) = @_;
 	my $rss = XML::RSS->new;
 	$rss->parsefile($fn);
 	$output and $output->push("\n[I] Attempting to import $fn...");
@@ -28,7 +28,9 @@ sub prepare {
 	my $basecol = ($termcolor ? Common::getColorsbyName("base") : "");
 	my $pccol = ($termcolor ? Common::getColorsbyName("cyan") : "");
 	my $npccol = ($termcolor ? Common::getColorsbyName("ltblue") : "");
-	print "Contains " . $#{$rss->{items}} . " items...";
+	$output and $output->push("Contains " . $#{$rss->{items}} . " items...");
+	my $opt;
+	if ($output and $isgui) { $opt = $output; } # if GUI, send InfMessages to GUI object.
 	my $itemno = 0;
 	my $nextid = FIO::config('Main','nextid');
 	my $purging = (FIO::config('Disk','purgeRSS') or 0); # only delete old RSS items if the user wants it done.
@@ -44,7 +46,7 @@ sub prepare {
 			($most,$mid,$least) = ($1,$2,$3);
 			$most = sprintf("%07s",$most);
 			$mid = sprintf("%07s",$mid);
-			infMes("* Found: $most-$mid-$least...",1);
+			infMes("* Found: $most-$mid-$least...",1,gobj => $opt);
 		} else{
 			$rawid =~ m/^([0-9a-zA-Z]{7})-([0-9a-zA-Z]{7})-([0-9a-fA-F]{7})$/;
 			($most,$mid,$least) = ($1,$2,$3);
@@ -61,13 +63,12 @@ print "For $numinhex...";
 		FIO::config('Disk','gui1',$most); # save as int
 		FIO::config('Disk','gui2',$mid); # save as int
 		if ($purging && $start < $end) {
-			infMes("Deleting old item from $date.",1);
+			infMes("Deleting old item from $date. (" . $#{$rss->{items}} . " left)",1,gobj => $opt);
 			splice(@{$rss->{items}},$itemno,1);
-			print " (" . $#{$rss->{items}} . " left) ";
 		} elsif ($start < $end) {
-			$debug and infMes("Keeping old item from $date.",1);
+			$debug and infMes("Keeping old item from $date.",1,gobj => $opt);
 		} else {
-			$debug and infMes("$date is after " . $end->ymd() . ".\n",1);
+			$debug and infMes("$date is after " . $end->ymd() . ".\n",1,gobj => $opt);
 		}
 		$itemno++;
     }
@@ -142,8 +143,8 @@ print ".";
 	Returns a hash of all dated items.
 =cut
 sub processDatedFile {
-	my ($fn,$output) = @_;
-	infMes("Reading $fn..",1);
+	my ($fn,$output,$opt) = @_;
+	infMes("Reading $fn..",1,$opt);
 	$fn = "schedule/$fn";
 	my $v = main::howVerbose();
 	if ( $v > 2) { print " $fn"; }
@@ -156,6 +157,7 @@ sub processDatedFile {
 			print "+";
 		} else {
 			print ".";
+			$opt and $opt->append(".");
 		}
 		my $fh;
 		unless (open($fh,"<$fn")) { # open file
@@ -186,12 +188,41 @@ sub processDatedFile {
 print $ti->name;
 				$items{$ldate} = [] unless exists $items{$ldate};
 				push(@{$items{$ldate}},$ti); # store record
-				print ".";
 			}
 			close($fh); # close file
 		}
 	}
 	return %items;
+}
+
+=item countWeeks()
+	DateTime counts weeks based on which week on the calendar they are. This is not useful behavior for finding if a date is the third Tuesday.
+	This function takes a day of the month as an integer ($d) and returns a week number, 1-5 or 0-4, depending on whether $maskpos is 0 or 1.
+=cut
+sub countWeeks {
+	my ($d,$maskpos) = @_;
+	my $val = ($maskpos ? 5 : 6);
+	if ($d < 32) { # fifth week
+		$val--;
+		if ($d < 28) { # fourth week
+			$val--;
+			if ($d < 21) { # third week
+				$val--;
+				if ($d < 14) { # second week
+					$val--;
+					if ($d < 7) { # first week
+						$val--;
+						if ($d < 1) { # bad week
+							$val--;
+						}
+					}
+				}
+			}
+		}
+	} else {
+		return -1;
+	}
+	return $val;
 }
 
 =item processFile()
@@ -200,7 +231,7 @@ print $ti->name;
 	Returns array of RItems.
 =cut
 sub processFile {
-	my ($fn,$d,$hr,$output) = @_;
+	my ($fn,$d,$hr,$output,$opt,$timed) = @_;
 	$fn = "schedule/$fn";
 	my $v = main::howVerbose(); 
 	if ( $v > 2) { print " $fn"; }
@@ -213,6 +244,7 @@ sub processFile {
 			print "+";
 		} else {
 			print ".";
+			$opt and $opt->append(".");
 		}
 		my $fh;
 		unless (open($fh,"<$fn")) { # open file
@@ -236,15 +268,33 @@ sub processFile {
 				} elsif ($descact && $k eq "---") { # this is another line of text
 					my $parsed = Sui::expandMe($2,$ed);
 					$ti->text($ti->text() . "\n$parsed");
-				} elsif ($descact && $k eq "mask") { # this is another line of text (week masked) mask is sum of 1 = first, 2 = second, 4 = third, 8 = fourth, 16 = fifth
+				} elsif ($descact && $k eq "mask") { # this is another line of text (week masked) mask is sum of 1 = first, 2 = second, 4 = third, 8 = fourth, 16 = fifth, 32 = final (fourth or fifth)
 					my $raw = $2;
 					$raw =~ /(\d+),(.+)/;
 					my $week = $1;
-					my $pweek = $ed->week_of_month();
-				print "\n...\t$week vs $pweek\t...";
-					next unless (getBit($pweek,$week));
-				print "+";
+					my $pweek = countWeeks($ed->day());
+					if($week == 32) { # final week
+						my $date2 = $ed->clone;
+						$date2->set_day(1)->add( months => 1 )->subtract( days => 1 );
+						my $ender = $date2->day();
+#						print "Last day: $ender - 6 = ";
+						$ender -= 6;
+#						print "first last of this weekday: $ender\n";
+						next unless ($ender <= $ed->day());
+						next unless (Common::getBit($pweek - 1,24)); # Fourth or fifth
+						$week = 24;
+					}
+					next unless (Common::getBit($pweek - 1,$week));
 					my $parsed = Sui::expandMe($2,$ed);
+					$parsed =~ /^([0-9]{4})?,?(.*)/; # 24H time starts line
+					if (defined $1) { # masked event with time
+						print ">";
+						if (not defined $$timed{$1}) {
+							$$timed{$1} = [];
+						}
+						push(@{$$timed{$1}},$2);
+						next; # prevents reprinting of line in following instruction
+					}
 					$ti->text($ti->text() . "\n$parsed");
 				} elsif ($k eq "lead") { # how far ahead the post is dated from the publication date MUST be in the file before the text with date replacements, or the date will be wrong.
 					my $lead = int($2);
@@ -266,13 +316,27 @@ sub processFile {
 					$descact = 0;
 				} elsif ($k eq "last") { # the end of the post record
 					$descact = 0;
-					next if (exists $$hr{$ti->date(undef,1)} && findIn($ti->title,@{$$hr{$ti->date(undef,1)}}));
+					next if (exists $$hr{$ti->date(undef,1)} && Common::findIn($ti->title,@{$$hr{$ti->date(undef,1)}}));
 					push(@{$$hr{$ti->date(undef,1)}},$ti->title);
+					foreach my $t (sort keys %$timed) {
+						my $time = ($t - ($t > 1259 ? 1200 : 0)) . " m";
+						substr($time,(length($time) < 6 ? 1 : 2),0,":");
+						substr($time,-1,0,($t > 1259 ? "p" : "a"));
+						$ti->text($ti->text . "\n$time - ");
+						my $first = 1;
+						foreach my $event (@{$$timed{$t}}) {
+							unless ($first) { $ti->text($ti->text . "\n\t"); }
+							$first = 0;
+							$ti->text($ti->text . "$event");
+						}
+					}
 					push(@items,$ti); # store record
 					last if(!defined $2 || $2 eq "1"); # if last item, exit loop
 					print $fn;
 					$ed = $d + DateTime::Duration->new( days=> (FIO::config('Main','eventlead') or 0)); # so we can add to it without losing our place.
 					$ti = RItem->new(date => "$rdate"); # start new record, in case there are more items in this file
+				} elsif ($k eq "defer" || $k eq "defered") { # temporary hide
+					next; # The user just wants this to be hidden, for now.
 				} else { # Oops! Error.
 					warn "\n[W] I found unexpected keyword $k with value $2.\n";
 				}
@@ -289,11 +353,12 @@ sub processFile {
 	returns the RSS object? or any error codes? Haven't decided.
 =cut
 sub addDatedToday {
-	my ($r,$hr,$ar,$d,$out) = @_;
+	my ($r,$hr,$ar,$d,$out,$opt) = @_;
 	if (main::howVerbose() > 0) {
 		print "\nRunning dated objects: ";
 	} else {
 		print "Y";
+		$opt and $opt->append(";");
 	}
 	my @items = @$ar;
 	foreach my $i (@items) { # put items in RSS objects
@@ -315,23 +380,25 @@ print ".";
 	returns the RSS object? or any error codes? Haven't decided.
 =cut
 sub processDay {
-	my ($d,$r,$hr,$out) = @_;
+	my ($d,$r,$hr,$out,$opt) = @_;
 	if (main::howVerbose() > 0) {
 		print "\nFor " . $d->ymd() . ": ";
 	} else {
 		print "|";
 	}
+	$opt and $opt->push("Checking " . $d->ymd() . ": ");
 	my @items;
+	my %timedentry;
 	my $fn = lc($d->day_name()) . ".txt"; # check day.txt
-	push(@items,processFile($fn,$d,$out));
+	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
 	$fn = substr($fn,0,-4) . $d->week_of_month() . ".txt"; # check day#.txt
-	push(@items,processFile($fn,$d,$out));
+	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
 	$fn = substr($fn,0,-5) . ($d->week_of_month() % 2 ? "odd" : "even") . ".txt"; # check dayeven/dayodd.txt
-	push(@items,processFile($fn,$d,$out));
+	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
 	$fn = $d->strftime("date%d.txt"); # check date0#.txt (same date each month events)
-	push(@items,processFile($fn,$d,$out));
+	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
 	$fn = $d->ymd() . ".txt"; # check YYYY-MM-DD.txt (events generated for this date specifically)
-	push(@items,processFile($fn,$d,$out));
+	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
 	# check for today.txt
 	# process daily if present
 	foreach my $i (@items) { # after pulling events, put them in RSS objects
@@ -370,7 +437,10 @@ print ".";
 	returns the number of days processed.
 =cut
 sub processRange {
-	my ($r,$start,$end,$out) = @_; # format of dates is YYYYMMDD padded with 0's.
+	my ($r,$start,$end,$out,$isgui) = @_; # format of dates is YYYYMMDD padded with 0's.
+# TODO: If $isgui, use popup windows instead of dying.
+	my $opt;
+	$opt = $out if $isgui;
 	use DateTime;
 	my $dp;
 	my $ds;
@@ -405,14 +475,14 @@ sub processRange {
 			);
 	}
 	($ds < $dp) && die "I cannot go backward in time. Sorry.\n";
-	infMes("Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":");
+	infMes("Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":",,$opt);
 	my %items = catalogRSS($r); # grab item titles to prevent duplication.
 #use Data::Dumper; print Dumper \%items;
-	my %dated = processDatedFile("dated.txt",\%items,$out);
+	my %dated = processDatedFile("dated.txt",\%items,$out,$opt);
 #print ";;;" . Dumper %dated;
 	while ($dp <= $ds) {
-		processDay($dp,$r,\%items,$out);
-		addDatedToday($r,\%items,$dated{$dp->ymd()},$dp,$out); # TODO: Add items from %dated ($dated{$dp})
+		processDay($dp,$r,\%items,$out,$opt);
+		addDatedToday($r,\%items,($dated{$dp->ymd()} or []),$dp,$out,$opt); # TODO: Add items from %dated ($dated{$dp})
 #		print $dp->ymd() . " ... " . Dumper \@{$dated{$dp->ymd()}};
 		
 		$dp = $dp + DateTime::Duration->new( days=> 1 );
