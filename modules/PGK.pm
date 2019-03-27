@@ -5,7 +5,7 @@ print __PACKAGE__;
 
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox Pdie Pwait Pager Pfresh labeledRow labeledCol );
+@EXPORT_OK = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox Pdie Pwait Pager Pfresh labeledRow labeledCol calButton);
 use Prima qw(Application Buttons MsgBox FrameSet);
 
 use FIO qw( config );
@@ -1570,7 +1570,7 @@ sub startwithDB {
 # TODO: Replace with SaveDialog to choose DB filename?
 		my $filebox = labelBox($liteopts,"Database filename:",'filebox','h');
 		my $file = $filebox->insert( InputLine => text => (config('DB','host') or Sui::passData('dbname') . ".dbl"));
-		$filebox->insert( Button => text => "Choose", onClick => sub { my $o = Prima::OpenDialog->new( filter => [['Databases' => '*.db*'],['All' => '*'],],directory => '.',); $file->text = $o->fileName if $o->execute; }, hint => "Click here to choose an existing SQLite database file.", );
+		$filebox->insert( Button => text => "Choose", onClick => sub { my $o = Prima::OpenDialog->new( filter => [['Databases' => '*.db*'],['All' => '*'],],directory => '.',); $file->text($o->fileName) if $o->execute; }, hint => "Click here to choose an existing SQLite database file.", );
 		$box->insert( Button => text => "Save", onClick => sub {
 			$box->hide();
 			$text->push("Saving database type...");
@@ -1587,7 +1587,7 @@ sub startwithDB {
 			my ($dbh,$error) = loadDB($base,$host,'',$uname,$text,$box->insert( Label => text => ""));
 			$box->destroy();
 			unless (defined $dbh) { Common::errorOut('PGK::loadDB',$error); return $error; }
-			PGUI::populateMainWin($dbh,$gui);
+			PGUI::populateMainWin($dbh,$gui,0);
 		} else { # ask for password:
 			my $passrow = labelBox($box,"Enter password for $uname\@$host:",'pass','h');
 			my $passwd = $passrow->insert( InputLine => text => '', writeOnly => 1,);
@@ -1595,7 +1595,7 @@ sub startwithDB {
 				my ($dbh,$error) = loadDB($base,$host,$passwd->text,$uname,$text,$box->insert( Label => text => ""));
 				$box->destroy();
 				unless (defined $dbh) { Common::errorOut('PGK::loadDB',$error); return $error; }
-				PGUI::populateMainWin($dbh,$gui);
+				PGUI::populateMainWin($dbh,$gui,0);
 			}, );
 		}
 	}
@@ -1663,6 +1663,31 @@ sub insertDateWidget {
 	}, imageFile => 'modules/cal-icon.png', );
 	$calbut->set( backColor => PGK::convertColor($$extra{bgcol})) if (defined $$extra{bgcol});
 	return $calent;
+}
+print ".";
+
+sub insertCalButton {
+	my ($parent,$target,$name,$title) = @_;
+	(defined $parent) or die "insertCalButton requires a parent" . Common::lineNo();
+	(defined $target) or die "insertCalButton requires a text entry for output" . Common::lineNo();
+	my $cbut = $parent->insert( SpeedButton => name => ($name or 'showcal'), onClick => sub {
+		my $calwin = Prima::Dialog->create( size => [ 250, 275 ], text => ($title or "Choose Date"),);
+		my $cal = $calwin->insert( Calendar => useLocale => 0, onChange  => sub { $target->text(sprintf("%04d-%02d-%02d",$_[0]->year + 1900, $_[0]->month + 1, $_[0]->day)); }, pack => { fill => 'both', expand => 1, side => 'top',}, sizeMin => [200,200],);
+		my $predate = $target->text();
+		my ($y,$m,$d) = $predate =~ /^(\d{4})-(\d{2})-(\d{2})$/;
+		if ($predate == "0000-00-00" or !(defined $y and defined $m and defined $d)) {
+			$cal->date_from_time( localtime );
+		} else {
+			$cal->year($y - 1900);
+			$cal->month($m - 1);
+			$cal->day($d);
+		}
+		$calwin->insert( SpeedButton => text => "Cancel", pack => { fill => 'x', side => 'bottom', expand => 0}, onClick => sub { $calwin->close(); }, );
+		$calwin->insert( SpeedButton => text => "Set", pack => { fill => 'x', side => 'bottom', expand => 0}, onClick => sub { $target->text(sprintf("%04d-%02d-%02d",$cal->year + 1900, $cal->month + 1, $cal->day)); $calwin->close(); }, );
+		$calwin->execute;
+		$calwin->destroy;
+	}, imageFile => 'modules/cal-icon.png', );
+	return $cbut;
 }
 print ".";
 
@@ -1803,6 +1828,22 @@ sub scrollit {
 	return unless defined $bar and defined $delta;
 	my $value = $bar->value;
 	$bar->value($value + $delta);
+}
+print ".";
+
+sub buttonPic {
+	my ($button, $url, $hitserver,$textob) = @_;
+	my $stat = getGUI('status');
+	my $page = undef; # replace later with error panel
+	Pfresh();
+	my $viewsize = 75;
+	my ($error,$server,$img,$lfp) = PGUI::fetchapic($url,$hitserver,$stat,$page);
+	return $error if $error;
+	if (-r $lfp . $img ) {
+		my ($pic,$iz) = PGUI::showapic($lfp,$img,$viewsize);
+		$button->image($pic);
+	}
+	return 0;
 }
 print ".";
 

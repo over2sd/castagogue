@@ -6,7 +6,7 @@ require Exporter;
 @EXPORT = qw( );
 
 use FIO qw( config );
-use PGK;
+use PGK qw( labelBox getGUI sayBox Pdie Pwait Pager Pfresh applyFont VBox HBox labeledRow );
 use Prima qw( ImageViewer Sliders Calendar );
 use Common qw( missing infMes );
 use Options;
@@ -14,6 +14,7 @@ use RRGroup;
 use RItem;
 use strict;
 use warnings;
+use DateTime;
 
 =head1 NAME
 
@@ -30,6 +31,75 @@ A library of functions used to build and manipulate the program's Prima user int
 package PGUI;
 
 my @openfiles = [];
+
+sub showMonth {
+	my @days_in_months = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
+	my ($target,$date,$far,$out) = @_;
+	$target->empty();
+	my $stat = getGUI('status');
+	$date->set( day => 1); # find first day...
+	print "Showing " . $date->ymd . ":...";
+	my $firstweekday = $date->dow(); # ...so we can see which day the month starts on
+	$firstweekday = 0 if $firstweekday == 7;
+	my @weeks = ();
+	my $count = 6;
+	my $butsize = 90;
+	my $hitserver = 0;
+	my $moment = 7;
+	while ($count > 0) {
+		$count--;
+	my $name = "week $count";
+		push(@weeks,$target->insert( HBox => name => $name, width => ($butsize * 7 + 7), height => ($butsize + 2)));
+	}
+	my $pos = 0;
+	my $w = 0;
+	while ($pos < $firstweekday) {
+		my $row = $weeks[$w];
+		$weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "", onClick => sub { print "I'm in " . $row->name . "..."; } );
+		$pos++;
+	}
+	foreach my $d (1 .. $days_in_months[$date->month - 1]) {
+		my $row = $weeks[$w];
+		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "$d", onClick => sub { print "I'm in " . $row->name . "..."; } );
+		$pos++;
+		if (1) { # if the date has an associated item in the dated.txt file...
+			my $error = PGK::buttonPic($a,"http://example.com/1.png",\$hitserver,$out);
+		}
+		if ($hitserver) {
+			$stat->push("Waiting...");
+			Pwait($moment);
+			$hitserver = 0;
+		}
+		if ($pos > 6) {
+			$pos = 0;
+			$w++;
+		}
+	}
+	while ($pos != 0 && $pos < 7) {
+		my $row = $weeks[$w];
+		$weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "X", onClick => sub { print "I'm in " . $row->name . "..."; } );
+		$pos++;
+	}
+	print "Starts on $firstweekday...";
+}
+
+sub showMonthly {
+	my ($parent,$bgcolor,$filarrref) = @_;
+	my $pane = PGK::quickBox($parent,"Monthly",800,600);
+	my $rows = $pane->{mybox};
+	$pane->backColor(PGK::convertColor($bgcolor));
+	my $picker = $rows->insert( HBox => name => "monthpick");
+	my $date = DateTime->now;
+	my $months = [ "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+	my $calhome = $rows->insert( VBox => name => 'Calendar');
+	my $monther = $picker->insert( ComboBox => style => cs::DropDown, height => 35, growMode => gm::GrowLoX | gm::GrowLoY, items => $months, onChange => sub { $date->set(month => $_[0]->focusedItem + 1); showMonth($calhome,$date,$filarrref); }, text => $$months[$date->month() - 1], );
+	$picker->insert( SpinEdit => name   => 'Year', min    => 1900, max => 2099, growMode => gm::GrowLoX | gm::GrowLoY, value => $date->year, onChange => sub { $date->set(year => $_[0]->value()); showMonth($calhome,$date,$filarrref); } );
+	my $output = $picker->insert( InputLine => text => "");
+	showMonth($calhome,$date,$filarrref,$output);
+	$pane->execute();
+	devHelp($parent,"Setting a monthly schedule");
+}
+print ".";
 
 sub saveItAsIs {
 	my ($rss,$ofn,$output,$target,$bgcol) = @_;
@@ -165,15 +235,7 @@ sub resetScheduling {
 	my ($tb,$tbi) = labeledRow($stage,"Content: ",( contents => [[InputLine => text => "This is a wonderful place to put the final description text.", pack => { fill => 'both' }, width => 400,]], boxfill => 'x', boxex => 0, labfill => 'x', labex => 1,));
 	my $detbox = $stage->insert( HBox => name => "me" );
 	my $calent = $detbox->insert( InputLine => text => '0000-00-00', name => 'imadate' );
-	my $calbut = $detbox->insert( SpeedButton => name => ('showcal'), onClick => sub {
-		my $calwin = Prima::Dialog->create( size => [ 250, 275 ], text => "Choose Date",);
-		my $cal = $calwin->insert( Calendar => useLocale => 0, onChange  => sub { $calent->text(sprintf("%04d-%02d-%02d",$_[0]->year + 1900, $_[0]->month + 1, $_[0]->day)); }, pack => { fill => 'both', expand => 1, side => 'top',}, sizeMin => [200,200],);
-		$cal->date_from_time( localtime );
-		$calwin->insert( SpeedButton => text => "Cancel", pack => { fill => 'x', side => 'bottom', expand => 0}, onClick => sub { $calent->text('0000-00-00'); $calwin->close(); }, );
-		$calwin->insert( SpeedButton => text => "Set", pack => { fill => 'x', side => 'bottom', expand => 0}, onClick => sub { $calent->text(sprintf("%04d-%02d-%02d",$cal->year + 1900, $cal->month + 1, $cal->day)); $calwin->close(); }, );
-		$calwin->execute;
-		$calwin->destroy;
-	}, imageFile => 'modules/cal-icon.png', );
+	my $calbut = PGK::insertCalButton($detbox,$calent,'calent',"Choose Date");
 	my $timent = $detbox->insert( InputLine => text => "0800", hint => "Time to publish post" );
 	my $catent = $detbox->insert( InputLine => name => "category", hint => "Post category" );
 	my %tunnel;
@@ -191,7 +253,8 @@ sub resetScheduling {
 	refreshDescList($lister,$prev,$tar,$sched);
 # Show these: fields for each dated.txt field, calendar for scheduling, time fields, schedule button
 # will this tab be used for both individual schedule items and for weekly schedules? Do I need another tab?
-	my $op = $schpage->insert( Button => text => "Weekly Schedule", onClick => sub { devHelp("Setting a weekly schedule"); }, pack => { fill => 'x', expand => 0, }, );
+	my $op = $schpage->insert( Button => text => "Weekly Schedule", onClick => sub { devHelp($schpage,"Setting a weekly schedule"); }, pack => { fill => 'x', expand => 0, }, );
+	my $mb = $schpage->insert( Button => text => "Monthly Schedule", onClick => sub { showMonthly($schpage,$bgcol) }, pack => { fill => 'x', expand => 0, }, );
 # This page will be for scheduling specific images with specific dates
 # buttons to load dsc files
 # a pane for dsc files to load into
@@ -300,6 +363,27 @@ sub saveDatedSequence {
 	my $e = FIO::writeLines($fn,\@lines,0);
 	$stat->push("Sequence saved.");
 	return $e;
+}
+print ".";
+
+sub loadDatedDays {
+	# load lines from dated.txt
+	# for each line, parse:
+		my $line = shift;
+		$line =~ m/date=(\d\d\d\d-\d\d-\d\d)>/;
+		my $day = $1;
+		$line =~ m/image=(.*?)>/;
+		my $url = $1;
+		$line =~ m/desc=(.*?)>/;
+		my $desc = $1;
+		$line =~ m/cat=(.*?)>/;
+		my $cat = $1;
+		$line =~ m/title=(.*?)>/;
+		my $title = $1;
+		print "I found $title on $day at $url, described as a $cat defined by $desc...\n";
+	# save each line as a hashref: { title => $title, desc => $desc, url => $url }
+	# push the hashref to an array in a hash: $items{$cat}{$day}[n]
+	# return the hash of arrays
 }
 print ".";
 
@@ -415,6 +499,14 @@ sub tryLoadGroup {
 	return $group;
 }
 print ".";
+
+=item carpWithout PREQ ACTIONTEXT PREQTEXT using a sayBox
+
+IF PREQ is undefined, complain that ACTIONTEXT can't be done without PREQTEXT
+Returns 0 if PREQ is defined.
+Returns 1 if message was triggered.
+
+=cut
 
 sub carpWithout {
 	my ($preq,$action,$preqtxt) = @_;
@@ -1251,6 +1343,7 @@ sub populateMainWin {
 
 	$pager->switchToPanel("Describing");
 	$$gui{pager} = $pager;
+
 	return 0;
 }
 print ".";

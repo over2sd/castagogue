@@ -5,6 +5,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw( config saveConf loadConf );
 print __PACKAGE__;
+require Common;
 
 my $cfg = Config::IniFiles->new();
 my $cfgread = 0;

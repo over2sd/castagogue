@@ -13,8 +13,9 @@ When an image is clicked, it'll open a window with a large version of that image
 Regex out %d and other sprintf-decoded strings with \%.
 Make Scheduling page's button creator read the titles, not the description, unless the titles are numerics AND have duplication.
 Make viewsize an option pulled from config.
-Let mask##= be treated as text= or continuation of text.
+Let mask=##, be treated as text= or continuation of text.
 If $isgui, use popup windows instead of dying in processRange.
 Code review window for Publishing page.
 Use events.txt, a dated file, to generate additional lines for event posts, which should be marked with insert=events and have timeHHMM= markers on their lines.
 Have a calendar that, when a date is clicked, opens a dialog showing all events for that day (from events.txt) and allowing the user to add an event by entering a time and text.
+After publishing, give an Exit button in addition to a Continue button.
