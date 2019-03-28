@@ -34,16 +34,16 @@ my @openfiles = [];
 
 sub showMonth {
 	my @days_in_months = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
-	my ($target,$date,$far,$out) = @_;
+	my ($target,$date,$far,$out,$cat) = @_;
 	$target->empty();
 	my $stat = getGUI('status');
 	$date->set( day => 1); # find first day...
-	print "Showing " . $date->ymd . ":...";
+	print "Showing " . $date->ymd . ": $cat...";
 	my $firstweekday = $date->dow(); # ...so we can see which day the month starts on
 	$firstweekday = 0 if $firstweekday == 7;
 	my @weeks = ();
 	my $count = 6;
-	my $butsize = 90;
+	my $butsize = 50;
 	my $hitserver = 0;
 	my $moment = 7;
 	while ($count > 0) {
@@ -58,12 +58,13 @@ sub showMonth {
 		$weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "", onClick => sub { print "I'm in " . $row->name . "..."; } );
 		$pos++;
 	}
+	my ($schedh,$regh) = @$far;
 	foreach my $d (1 .. $days_in_months[$date->month - 1]) {
 		my $row = $weeks[$w];
 		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "$d", onClick => sub { print "I'm in " . $row->name . "..."; } );
 		$pos++;
 		if (1) { # if the date has an associated item in the dated.txt file...
-			my $error = PGK::buttonPic($a,"http://example.com/1.png",\$hitserver,$out);
+			#my $error = PGK::buttonPic($a,"http://example.com/1.png",\$hitserver,$out);
 		}
 		if ($hitserver) {
 			$stat->push("Waiting...");
@@ -84,20 +85,27 @@ sub showMonth {
 }
 
 sub showMonthly {
-	my ($parent,$bgcolor,$filarrref) = @_;
-	my $pane = PGK::quickBox($parent,"Monthly",800,600);
-	my $rows = $pane->{mybox};
+	my ($gui,$bgcolor,$filarrref) = @_;
+	
+	my $win = $$gui{mainWin};
+	my $note = $$gui{pager};
+	$note->hide();
+	my $pane = $win->insert( VBox => name => "monthly");
+	my $rows = $pane->insert( VBox => name => "rows");
 	$pane->backColor(PGK::convertColor($bgcolor));
 	my $picker = $rows->insert( HBox => name => "monthpick");
 	my $date = DateTime->now;
 	my $months = [ "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 	my $calhome = $rows->insert( VBox => name => 'Calendar');
-	my $monther = $picker->insert( ComboBox => style => cs::DropDown, height => 35, growMode => gm::GrowLoX | gm::GrowLoY, items => $months, onChange => sub { $date->set(month => $_[0]->focusedItem + 1); showMonth($calhome,$date,$filarrref); }, text => $$months[$date->month() - 1], );
-	$picker->insert( SpinEdit => name   => 'Year', min    => 1900, max => 2099, growMode => gm::GrowLoX | gm::GrowLoY, value => $date->year, onChange => sub { $date->set(year => $_[0]->value()); showMonth($calhome,$date,$filarrref); } );
 	my $output = $picker->insert( InputLine => text => "");
+	my @categories = ( "prayer", "proverb", "ministry" );
+	my $catter = $picker->insert( ComboBox => style => cs::DropDown, height => 35, items => @categories, text => $categories[0] );
+	my $monther = $picker->insert( ComboBox => style => cs::DropDown, height => 35, growMode => gm::GrowLoX | gm::GrowLoY, items => $months, onChange => sub { $date->set(month => $_[0]->focusedItem + 1); showMonth($calhome,$date,$filarrref,$output,$catter->text); }, text => $$months[$date->month() - 1], );
+	$picker->insert( SpinEdit => name   => 'Year', min    => 1900, max => 2099, growMode => gm::GrowLoX | gm::GrowLoY, value => $date->year, onChange => sub { $date->set(year => $_[0]->value()); showMonth($calhome,$date,$filarrref,$output,$catter->text); } );
 	showMonth($calhome,$date,$filarrref,$output);
-	$pane->execute();
-	devHelp($parent,"Setting a monthly schedule");
+	$pane->insert( Button => text => "Close", onClick => sub { $pane->destroy(); $note->show(); } );
+	devHelp($win,"Setting a monthly schedule");
+
 }
 print ".";
 
@@ -253,8 +261,9 @@ sub resetScheduling {
 	refreshDescList($lister,$prev,$tar,$sched);
 # Show these: fields for each dated.txt field, calendar for scheduling, time fields, schedule button
 # will this tab be used for both individual schedule items and for weekly schedules? Do I need another tab?
-	my $op = $schpage->insert( Button => text => "Weekly Schedule", onClick => sub { devHelp($schpage,"Setting a weekly schedule"); }, pack => { fill => 'x', expand => 0, }, );
-	my $mb = $schpage->insert( Button => text => "Monthly Schedule", onClick => sub { showMonthly($schpage,$bgcol) }, pack => { fill => 'x', expand => 0, }, );
+	my @images = loadDatedDays($$gui{status},1);
+	my $op = $schpage->insert( Button => text => "Weekly Schedule", onClick => sub { devHelp($gui,"Setting a weekly schedule"); }, pack => { fill => 'x', expand => 0, }, );
+	my $mb = $schpage->insert( Button => text => "Monthly Schedule", onClick => sub { showMonthly($gui,$bgcol,\@images) }, pack => { fill => 'x', expand => 0, }, );
 # This page will be for scheduling specific images with specific dates
 # buttons to load dsc files
 # a pane for dsc files to load into
@@ -367,9 +376,13 @@ sub saveDatedSequence {
 print ".";
 
 sub loadDatedDays {
+	my ($stat,$clobber) = @_;
+	my %scheduled = ();
+	my %regular = ();
 	# load lines from dated.txt
+	my @lines = FIO::readFile("schedule/dated.txt",$stat,0);
+	foreach my $line (@lines) {
 	# for each line, parse:
-		my $line = shift;
 		$line =~ m/date=(\d\d\d\d-\d\d-\d\d)>/;
 		my $day = $1;
 		$line =~ m/image=(.*?)>/;
@@ -382,8 +395,32 @@ sub loadDatedDays {
 		my $title = $1;
 		print "I found $title on $day at $url, described as a $cat defined by $desc...\n";
 	# save each line as a hashref: { title => $title, desc => $desc, url => $url }
+		my $h = { title => $title, desc => $desc, url => $url };
+		if( not defined $scheduled{$cat}{$day} or $clobber ) { $scheduled{$cat}{$day} = $h; }
+	}
+	# load lines from dated.txt
+	@lines = FIO::readFile("schedule/calendar.txt",$stat,0);
+	foreach my $line (@lines) {
+	# for each line, parse:
+		$line =~ m/date=(\d\d)>/;
+		my $day = $1;
+		$line =~ m/image=(.*?)>/;
+		my $url = $1;
+		$line =~ m/desc=(.*?)>/;
+		my $desc = $1;
+		$line =~ m/cat=(.*?)>/;
+		my $cat = $1;
+		$line =~ m/title=(.*?)>/;
+		my $title = $1;
+		print "I found $title on $day at $url, described as a $cat defined by $desc...\n";
+	# save each line as a hashref: { title => $title, desc => $desc, url => $url }
+		my $h = { title => $title, desc => $desc, url => $url };
 	# push the hashref to an array in a hash: $items{$cat}{$day}[n]
-	# return the hash of arrays
+		if( not defined $regular{$cat}{$day} ) { $regular{$cat}{$day} = []; }
+		push(@{ $regular{$cat}{$day} },$h);
+	}
+	# return the hashes of arrays
+	return (\%scheduled,\%regular);
 }
 print ".";
 
