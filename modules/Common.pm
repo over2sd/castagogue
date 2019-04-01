@@ -777,5 +777,11 @@ sub pad { # recipe from perlfaq (READ" pad TEXT to LENGTH with CHAR
 }
 print ".";
 
+# Ordinal function provided by Borodin on a Stack Overflow question
+sub ordinal {
+  return $_.(qw/th st nd rd/)[/(?<!1)([123])$/ ? $1 : 0] for int shift;
+}
+print ".";
+
 print " OK; ";
 1;

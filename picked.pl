@@ -9,7 +9,7 @@ use utf8;
 ####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
 
 my $PROGRAMNAME = "Castapic";
-my $version = "0.017a";
+my $version = "0.018a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGRAMNAME v$version is running.";
@@ -46,7 +46,7 @@ foreach (Sui::getDefaults()) {
 }
 
 use Prima qw(Application Buttons MsgBox FrameSet Edit );
-my $gui = PGK::createMainWin($PROGRAMNAME,$version,800,500);
+my $gui = PGK::createMainWin($PROGRAMNAME,$version);
 my $text = $$gui{status};
 PGUI::populateMainWin(undef,$gui,0);
 my @lines = FIO::readFile("notes.txt",$text,1); # open the file for notes

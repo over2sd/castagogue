@@ -32,6 +32,26 @@ package PGUI;
 
 my @openfiles = [];
 
+sub chooseDayImage  {
+	my ($b,$day,$cat,$hr,$bsz) = @_;
+	# make a dialog box
+	# display the day of the month
+	my $dayth = Common::ordinal($day);
+	my $lktext = "Images in category '$cat' for the $dayth of the month";
+print "$lktext\n";
+	# first, make a button for adding images to the given day
+		# When pressed, open an askbox for the url, title, and description (date and category are set by caller of this function)
+		# once information is entered, make a new button for the new image.
+		# also, save the calendar.txt file
+	# read regular files for date given
+	foreach my $i ( @{ $$hr{$cat}{$day} } ) {
+		# display a button for each
+use Data::Dumper; print Dumper $i;
+		# when the button is pressed, select it as the image for the given button and close the dialog
+	}
+}
+print ".";
+
 sub showMonth {
 	my @days_in_months = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
 	my ($target,$date,$far,$out,$cat) = @_;
@@ -43,7 +63,7 @@ sub showMonth {
 	$firstweekday = 0 if $firstweekday == 7;
 	my @weeks = ();
 	my $count = 6;
-	my $butsize = 50;
+	my $butsize = (FIO::config('UI','caldaysize') or 100);
 	my $hitserver = 0;
 	my $moment = 7;
 	while ($count > 0) {
@@ -55,16 +75,24 @@ sub showMonth {
 	my $w = 0;
 	while ($pos < $firstweekday) {
 		my $row = $weeks[$w];
-		$weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "", onClick => sub { print "I'm in " . $row->name . "..."; } );
+		$weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "", );
 		$pos++;
 	}
 	my ($schedh,$regh) = @$far;
+	$date->ymd =~ /(\d\d\d\d)-(\d\d)-\d\d/;
+	my ($y,$m) = ($1,$2);
 	foreach my $d (1 .. $days_in_months[$date->month - 1]) {
 		my $row = $weeks[$w];
-		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "$d", onClick => sub { print "I'm in " . $row->name . "..."; } );
+		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "$d", onClick => sub { chooseDayImage($_[0],$d,$cat,$regh,$butsize,); } );
 		$pos++;
-		if (1) { # if the date has an associated item in the dated.txt file...
-			#my $error = PGK::buttonPic($a,"http://example.com/1.png",\$hitserver,$out);
+		my $hr = $$schedh{$cat}{"$y-$m-$d"};
+		if (defined $hr) { # if the date has an associated item in the dated.txt file...
+			my $url = $$hr{url};
+			my $tit = $$hr{title};
+			my $des = $$hr{desc};
+			my $error = PGK::buttonPic($a,$url,\$hitserver,$out);
+		} else {
+			# load placeholder image
 		}
 		if ($hitserver) {
 			$stat->push("Waiting...");
@@ -98,11 +126,12 @@ sub showMonthly {
 	my $months = [ "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 	my $calhome = $rows->insert( VBox => name => 'Calendar');
 	my $output = $picker->insert( InputLine => text => "");
-	my @categories = ( "prayer", "proverb", "ministry" );
-	my $catter = $picker->insert( ComboBox => style => cs::DropDown, height => 35, items => @categories, text => $categories[0] );
-	my $monther = $picker->insert( ComboBox => style => cs::DropDown, height => 35, growMode => gm::GrowLoX | gm::GrowLoY, items => $months, onChange => sub { $date->set(month => $_[0]->focusedItem + 1); showMonth($calhome,$date,$filarrref,$output,$catter->text); }, text => $$months[$date->month() - 1], );
+	my %sched = %{ $$filarrref[0] };
+	my @categories = keys %sched;
+	my $catter = $picker->insert( ComboBox => style => cs::DropDownList, height => 35, items => \@categories, text => $categories[0] );
+	my $monther = $picker->insert( ComboBox => style => cs::DropDownList, height => 35, growMode => gm::GrowLoX | gm::GrowLoY, items => $months, onChange => sub { $date->set(month => $_[0]->focusedItem + 1); showMonth($calhome,$date,$filarrref,$output,$catter->text); }, text => $$months[$date->month() - 1], );
 	$picker->insert( SpinEdit => name   => 'Year', min    => 1900, max => 2099, growMode => gm::GrowLoX | gm::GrowLoY, value => $date->year, onChange => sub { $date->set(year => $_[0]->value()); showMonth($calhome,$date,$filarrref,$output,$catter->text); } );
-	showMonth($calhome,$date,$filarrref,$output);
+	showMonth($calhome,$date,$filarrref,$output,$catter->text);
 	$pane->insert( Button => text => "Close", onClick => sub { $pane->destroy(); $note->show(); } );
 	devHelp($win,"Setting a monthly schedule");
 
@@ -393,7 +422,7 @@ sub loadDatedDays {
 		my $cat = $1;
 		$line =~ m/title=(.*?)>/;
 		my $title = $1;
-		print "I found $title on $day at $url, described as a $cat defined by $desc...\n";
+#		print "I found $title on $day at $url, described as a $cat defined by $desc...\n";
 	# save each line as a hashref: { title => $title, desc => $desc, url => $url }
 		my $h = { title => $title, desc => $desc, url => $url };
 		if( not defined $scheduled{$cat}{$day} or $clobber ) { $scheduled{$cat}{$day} = $h; }
@@ -402,7 +431,7 @@ sub loadDatedDays {
 	@lines = FIO::readFile("schedule/calendar.txt",$stat,0);
 	foreach my $line (@lines) {
 	# for each line, parse:
-		$line =~ m/date=(\d\d)>/;
+		$line =~ m/day=(\d\d)>/;
 		my $day = $1;
 		$line =~ m/image=(.*?)>/;
 		my $url = $1;
@@ -412,7 +441,7 @@ sub loadDatedDays {
 		my $cat = $1;
 		$line =~ m/title=(.*?)>/;
 		my $title = $1;
-		print "I found $title on $day at $url, described as a $cat defined by $desc...\n";
+#		print "I found $title on $day at $url, described as a $cat defined by $desc...\n";
 	# save each line as a hashref: { title => $title, desc => $desc, url => $url }
 		my $h = { title => $title, desc => $desc, url => $url };
 	# push the hashref to an array in a hash: $items{$cat}{$day}[n]

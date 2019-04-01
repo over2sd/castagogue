@@ -130,6 +130,7 @@ sub getOpts {
 		'042' => ['n',"How many rows per column in file lists?",'filerows',10,3,30,1,5],
 		'043' => ['t',"Color codes for gradient (comma separated)",'gradient'],
 		'044' => ['c',"Preview RSS feed before saving",'preview'],
+		'045' => ['n',"Size of calendar buttons",'caldaysize',100,20,500,1,10],
 
 		'100' => ['l',"Network",'Net'],
 		'101' => ['c',"Save bandwidth by saving image thumbnails",'savethumbs'],
