@@ -783,5 +783,23 @@ sub ordinal {
 }
 print ".";
 
+sub dateConv {
+	my $date = shift;
+	if (ref($date) eq "DateTime") {
+		$date->ymd =~ /(\d\d\d\d)-(\d\d)-(\d\d)/;
+		return ($1,$2,$3);
+	} else {
+		$date =~ /(\d\d\d\d)-(\d\d)-(\d\d)/;
+		my $source = lineNo();
+		die "Non-date string passed to dateConv: '$date' $source.\n" unless (defined $1 and defined $2 and defined $3);
+		my ($y,$m,$d) = ($1,$2,$3);
+		use DateTime;
+		use DateTime::Format::DateParse;
+		my $datestr = "$y-$m-$d";
+		return (DateTime::Format::DateParse->parse_datetime( $datestr ),$y,$m,$d);
+	}
+}
+print ".";
+
 print " OK; ";
 1;

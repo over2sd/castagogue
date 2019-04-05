@@ -4,12 +4,14 @@ use warnings;
 #use diagnostics;
 use utf8;
 
+use Data::Dumper; # TODO: Remove this diagnostic line
+
 # castapic
 #######  This will be an app that takes a file of image URLs and lets the user type in a description for each, then save those descriptions into another file.
 ####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
 
 my $PROGRAMNAME = "Castapic";
-my $version = "0.019a";
+my $version = "0.020a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGRAMNAME v$version is running.";

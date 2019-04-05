@@ -1227,13 +1227,13 @@ sub askbox {
 	my $numq = int((scalar @questions / 2)+ 0.5);
 #	print "Asking $numq questions...\n";
 	my $height = ($numq * 25) + 75;
+	my $useparent = (ref($parent) eq "Window" ? 1 : 0);
 	my $askbox = Prima::Dialog->create(
 		centered => 1,
 		borderStyle => bs::Sizeable,
 		onTop => 1,
 		width => 400,
 		height => $height,
-		owner => $parent,
 		text => $tibar,
 		valignment => ta::Middle,
 		alignment => ta::Left,
@@ -1711,6 +1711,7 @@ sub quickBox {
 	
 	my $extras = { pack => { side => 'bottom', fill => 'x' },};
 	my $fresh = Prima::MsgBox::insert_buttons( $askbox, $buttons, $extras); # not reinventing wheel
+print "but: " . ref($fresh) . "...";
 	return $askbox;
 }
 print ".";
