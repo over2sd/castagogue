@@ -32,14 +32,42 @@ package PGUI;
 
 my @openfiles = [];
 
+#-=-=-=-=-=-=-=-=-=-=-=-=- Executor start
+sub hashAndPic {
+	my ($us,$ts,$ds,$cs,$sh,$rh,$day,$tarobj,$parobj) = @_;
+	# also, store values in scheduled hash
+	$$sh{url} = $us; $$sh{title} = $ts; $$sh{desc} = $ds;
+	$$rh{$cs} = {} unless exists $$rh{$cs};
+	$$rh{$cs}{$day} = [] unless exists $$rh{$cs}{$day};
+	my $h = { url => $us, title => $ts, desc => $ds };
+	push(@{ $$rh{$cs}{$day} },$h);
+	$parobj->close();
+	my $x = 0;
+	return PGK::buttonPic($tarobj,$us,\$x);
+}
+#-=-=-=-=-=-=-=-=-=-=-=-=- Executor end
+
+
 sub chooseDayImage  {
-	my ($b,$p,$date,$cat,$ar) = @_;
+	my ($b,$p,$date,$cat,$ar,$bsz,$auto) = @_;
 	my ($sch,$rgh) = @$ar;
 	my ($w,$h) = (640,580);
 	my $bw = $w / 9; # button widths
 	my $tl = 16; # text length
 	my $n = 0;
 	my ($x,$y,$m,$day) = Common::dateConv($date);
+	if ($auto) { # skip UI elements
+		print "Choosing automatically for $y-$m-$day...";
+		my $array_length = scalar @{ $$rgh{$cat}{$day} };
+		return 0 unless $array_length > 0;
+		my $rpc = int(rand(512)) % $array_length;
+		my ($u,$t,$d) = ($$rgh{$cat}{day}[$rpc]{url},$$rgh{$cat}{day}[$rpc]{title},$$rgh{$cat}{day}[$rpc]{desc});
+		print "$u.\n";
+		$$sch{$cat} = {} unless exists $$sch{$cat};
+		$$sch{$cat}{"$y-$m-$day"} = {} unless exists $$sch{$cat}{"$y-$m-$day"};
+		my $s = $$sch{$cat}{"$y-$m-$day"};
+		return hashAndPic($u,$t,$d,$cat,$s,$rgh,$day,$b,$p); # choose the image selected
+	}
 	# make a dialog box
 	my $box = PGK::quickBox($p,"Choose an image",$w,$h);
 	# display the day of the month
@@ -48,42 +76,41 @@ sub chooseDayImage  {
 	$box->{mybox}->insert( Label => text => $lktext);
 	my $target = $box->{mybox}->insert( HBox => name => "row" );
 	# first, make a button for adding images to the given day
-$|++;
 	$box->{count} = 0;
 	#-------------------------------------Callback Start
 	sub myCallback {
 		my ($target,$parent,$row,$mar,$cat,$date,$l) = @_;
 		# When pressed, open an askbox for the url, title, and description (date and category are set by caller of this function)
 		my %ans = PGK::askbox($row,"Enter Image Details",{},"url","URL:","title","Title:","desc","Description:");
-		return -1 unless (exists $ans{url} and exists $ans{title} and exists $ans{desc} and $ans{url} ne '');
+		return 0 unless (exists $ans{url} and exists $ans{title} and exists $ans{desc} and $ans{url} ne '');
 		my ($u,$t,$d) = ($ans{url},$ans{title},$ans{desc});
 #print "u: $u t: $t d: $d;...";
 		# once information is entered, make a new button for the new image.
+		my ($sh,$rh) = @$mar;
+		$$rh{$cat} = {} unless exists $$rh{$cat};
+		my ($x,$y,$m,$day) = Common::dateConv($date);
+		$$rh{$cat}{$day} = [] unless exists $$rh{$cat}{$day};
+		my $h = { url => $u, title => $t, desc => $d };
+		push(@{ $$rh{$cat}{$day} },$h);
 		myButton($parent,$row,$target,$mar,$u,$t,$d,$cat,$date,$l);
+		return 1;
 	}
 	#------------------------------------Callback End
 	$target->insert( Button => text => "Add an Image", onClick => sub { # add button
-			$box->{count}++;
-			return myCallback($b,$box,$target,$ar,$cat,$x,$tl);
+			$box->{count} += myCallback($b,$box,$target,$ar,$cat,$x,$tl);
 		} );
+	$box->{count}++; # library button gets counted.
 	#================================== Button Start
 	sub myButton {
 		my ($parent,$row,$target,$mar,$u,$t,$d,$cat,$date,$l) = @_;
+		print Common::lineNo();
 		my ($sch,$rgh) = @$mar;
 		my ($y,$m,$day) = Common::dateConv($date);
 		$$sch{$cat} = {} unless exists $$sch{$cat};
 		$$sch{$cat}{"$y-$m-$day"} = {} unless exists $$sch{$cat}{"$y-$m-$day"};
 		my $s = $$sch{$cat}{"$y-$m-$day"};
 		$row->insert( Button => text => Common::shorten($t,($l or 20),4), onClick => sub {
-			# also, store values in scheduled hash
-			$$s{url} = $u; $$s{title} = $t; $$s{desc} = $d;
-			$$rgh{$cat} = {} unless exists $$rgh{$cat};
-			$$rgh{$cat}{$day} = [] unless exists $$rgh{$cat}{$day};
-			my $h = { url => $u, title => $t, desc => $d };
-			push(@{ $$rgh{$cat}{$day} },$h);
-			$parent->close();
-			my $x = 0;
-			return PGK::buttonPic($target,$u,\$x);
+			hashAndPic($u,$t,$d,$cat,$s,$rgh,$day,$target,$parent);
 		} );
 		$parent->{count}++;
 		if ($parent->{count} > 3) {
@@ -92,9 +119,39 @@ $|++;
 		}
 	}
 	#===================================== Button End
+	$target->insert( Button => text => "Add from library", onClick => sub {
+		devHelp($box,"Adding from the library"); return;
+		$box->{mybox}->hide();
+		my $stage = $box->insert( HBox => name => "stager", pack => { fill => 'both' }, );
+		my $chooser = $stage->insert( VBox => name => "chooser");
+		$chooser->insert( Label => text => "Choose a file of image descriptions:");
+		# list DSC files in library
+		my $tar = [];
+		my $sched = 2;
+		my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
+		$stage->insert(Label => text => " ", pack => { fill => 'both', expand => 1, }, );
+		# on click, destroy this box and list images in DSC file
+		# on click, destroy that box and add button to $target with myButton
+		# make sure this new image gets added to the regular list (calendar.txt)
+		my $extra = {
+			target => $target,
+			parent => $p,
+			button => $b,
+			date => $date,
+			category => $cat,
+			ar => $ar,
+			size => $bsz,
+			cbsub => \&myButton,
+			covers => $box->{mybox},
+			control => $stage,
+			dialog => $box,
+			trim => $tl,
+		};
+		refreshDescList($chooser,$prev,$tar,$sched,$extra);
+	} );
 	# read regular files for date given
 print "Day: $day -=- ";
-use Data::Dumper; print Dumper $$rgh{$cat};
+skrDebug::dump($$rgh{$cat});
 	foreach my $i ( @{ $$rgh{$cat}{$day} } ) {
 		# display a button for each
 		myButton($box,$target,$b,$ar,$$i{url},$$i{title},$$i{desc},$cat,$x,$tl);
@@ -108,6 +165,7 @@ sub showMonth {
 	my @days_in_months = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
 	my ($target,$date,$far,$out,$cat) = @_;
 	$target->empty();
+	$out->{days} = []; # clear storage for refresh
 	my $stat = getGUI('status');
 	$date->set( day => 1); # find first day...
 	print "Showing " . $date->ymd . ": $cat...";
@@ -134,7 +192,8 @@ sub showMonth {
 	my ($y,$m,$x) = Common::dateConv($date); # DateTime => (scalar,scalar,scalar)
 	foreach my $d (1 .. $days_in_months[$date->month - 1]) {
 		my $row = $weeks[$w];
-		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "$d", onClick => sub { chooseDayImage($_[0],$weeks[$w],"$y-$m-$d",$cat,$far,$butsize,); } );
+		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, name => "$y-$m-$d", text => "$d", onClick => sub { chooseDayImage($_[0],$weeks[$w],"$y-$m-$d",$cat,$far,$butsize,0); } );
+		push(@{ $out->{days} }, $a); # store for autofill
 		$pos++;
 		$d = "0$d" if $d < 10;
 		my $hr = $$schedh{$cat}{"$y-$m-$d"};
@@ -177,6 +236,7 @@ sub showMonthly {
 	my $months = [ "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 	my $calhome = $rows->insert( VBox => name => 'Calendar');
 	my $output = $picker->insert( InputLine => text => "");
+	$output->{days} = []; # needed for autofill button
 	my %sched = %{ $$filarrref[0] };
 	my @categories = keys %sched;
 	my $catter = $picker->insert( ComboBox => style => cs::DropDown, height => 35, items => \@categories, text => $categories[0] );
@@ -185,10 +245,26 @@ sub showMonthly {
 	$picker->insert( Label => text => " at the regular time " );
 	my $first = ( keys %{ $sched{$categories[0] } } )[0];
 	my %ex = %{ $sched{$categories[0]}{"$first"} };
-print Dumper \%ex;
+skrDebug::dump(\%ex);
 	my $timer = $picker->insert( InputLine => text => ($ex{time} or "0800" ) );
 	showMonth($calhome,$date,$filarrref,$output,$catter->text);
-	$pane->insert( Button => text => "Close", onClick => sub {
+	my $bbox = $pane->insert( HBox => name => "buttons" );
+	$bbox->insert( Button => text => "Autofill", onClick => sub {
+		foreach my $d (@{ $output->{days} }) {
+			print "\n" . $d->text . ": " . $sched{$catter->text}{$d->name}{url} . "..." if exists $sched{$catter->text}{$d->name}{url};
+		}
+		# run showmonth with a flag telling it to choose a random item from each day's list of regulars
+		# run through $output->{days}...
+		devHelp($pane,"Autofilling the month");
+	} );
+	$bbox->insert( Button => text => "Cancel", onClick => sub {
+		my $stat = getGUI('status');
+		$stat->push("Aborting monthly schedule.");
+		Pfresh();
+		$pane->destroy();
+		$note->show();
+		} );
+	$bbox->insert( Button => text => "Save", onClick => sub {
 		my $stat = getGUI('status');
 		my $fn = "schedule/dated.txt";
 		$stat->push("Appending post to $fn...");
@@ -312,7 +388,7 @@ sub schedulePost {
 		$$fields{calent}->set( backColor => ColorRow::stringToColor("#F00"), onChange => sub { $$fields{calent}->set( backColor => ColorRow::stringToColor("#FFF"), onChange => sub {}, ); }, );
 		return -1;
 	}
-	if ($$fields{catent}->text() eq "category") { # did you forget to set the date?
+	if ($$fields{catent}->text() eq "category") { # did you forget to set the category?
 		$stat->push("A valid category (even 'general') is required to schedule a post!");
 		$$fields{catent}->set( backColor => ColorRow::stringToColor("#F00"), onChange => sub { $$fields{catent}->set( backColor => ColorRow::stringToColor("#FFF"), onChange => sub {}, ); }, );
 		return -2;
@@ -981,7 +1057,7 @@ sub tryLoadGrouper {
 print ".";
 
 sub refreshDescList {
-	my ($resettarget,$target,$ar,$sched) = @_;
+	my ($resettarget,$target,$ar,$sched,$extra) = @_;
 	$resettarget->empty(); # clear the box
 #	print ")RT: " . $resettarget->name . "...";
 	my $odir = (FIO::config('Disk','rotatedir') or "lib"); # pick the directory
@@ -992,7 +1068,7 @@ sub refreshDescList {
 	my $text = "building buttons..";
 	foreach my $f (@files) {
 			$stat->push($text);
-			makeDescButton($lister,$f,$resettarget,$target,$ar,$sched);
+			makeDescButton($lister,$f,$resettarget,$target,$ar,$sched,$extra);
 			$text = "$text.";
 	}
 	$stat->push("Done. Pick a file.");
@@ -1007,8 +1083,9 @@ Given a reset TARGET widget, a FILE name, and a HASH in which to store data, loa
 =cut
 
 sub tryLoadDesc {
-	my ($resettarget,$fn,$target,$ar,$sched,$debug) = @_;
+	my ($resettarget,$fn,$target,$ar,$sched,$extra) = @_;
 	my $orderkey = 0; # keep URLs in order
+	my ($u1,$u2,$u3,$day) = (defined $$extra{date} ? Common::dateConv($$extra{date}) : (0,0,0,0));
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn = "$odir/$fn";
 	return 1 unless (-e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
@@ -1041,17 +1118,52 @@ sub tryLoadDesc {
 			$ti->link($2);
 			$descact = 0;
 		} elsif ($k eq "item") { # should start the item record.
-			(defined $debug) and print ":";
+			(main::howVerbose()) and print ":";
 			$count++;
 			$descact = 0;
 			my $pi = RItem->new( title => $ti->{title}, text => $ti->{text}, link => $ti->{link}, ); # separate the item from this loop
-			$resettarget->insert( Button => # place button for adding...
+			my $z = $resettarget->insert( Button => # place button for adding...
 				text => ($sched ? "Use " : "Add ") . Common::shorten($pi->title(),24,10),
 				height => $buttonheight,
+				onMouseEnter=> sub {
+					my $pr;
+					my $fill = 0; # filler variable
+					print "Mouse over " . $pi->title . "...\n";
+					return unless ($sched && defined $extra);
+					$target->empty();
+					my ($error,$server,$img,$lfp) = fetchapic($pi->link,$fill,$stat);
+					return $error if $error;
+					my $viewsize = 325;
+					my $pic = Prima::Image->new;
+					my $lfn = "$lfp$img";
+					$pic->load($lfn);
+					$pr = labelBox($target,$pi->text(),$pi->title(),'V', boxfill => 'both', boxex => 0, labfill => 'x', labex => 1);
+					if (-r $lfp . $img ) {
+						my ($pic,$iz) = showapic($lfp,$img,$viewsize);
+						$pr->insert( ImageViewer =>
+							name => $pi->title(), width => $viewsize, height => $viewsize,
+							pack => {fill => 'none'}, image => $pic);
+						Pfresh();
+					}
+					
+				},
 				onClick => sub {
 					my $pr;
 					if ($sched) { # on the schedule page
 						my $fill = 0; # filler variable
+						if ($sched == 2 && defined $extra) {
+							my $description = $pi->text();
+							$description =~ s/\s+^//; # trim trailing whitespace
+							$$extra{cbsub}->($$extra{dialog},$$extra{target},$$extra{button},$$extra{ar},$pi->link,$pi->title,$description,$$extra{category},$$extra{date},$$extra{trim});
+							$$extra{control}->destroy(); # kill the chooser
+							$$extra{covers}->show(); # reshow the list
+							my ($sh,$rh) = @{ $$extra{ar} };
+							$$rh{$$extra{category}} = {} unless exists $$rh{$$extra{category}};
+							$$rh{$$extra{category}}{$day} = [] unless exists $$rh{$$extra{category}}{$day};
+							my $h = { url => $pi->link, title => $pi->title, desc => $description };
+							push(@{ $$rh{$$extra{category}}{$day} },$h);
+							return;
+						}
 						$target->empty();
 						my ($error,$server,$img,$lfp) = fetchapic($pi->link,$fill,$stat);
 						return $error if $error;
@@ -1093,12 +1205,49 @@ sub tryLoadDesc {
 #defined $debug and print "\n $k = $2...";
 	}
 	$resettarget->insert( Button => # place button for adding... one final button.
-		text => "Add " . Common::shorten($ti->title(),24,10),
+		text => ($sched ? "Use " : "Add ") . Common::shorten($ti->title(),24,10),
 		height => $buttonheight,
+		onMouseEnter=> sub {
+			my $pr;
+			my $fill = 0; # filler variable
+			print "Mouse over " . $ti->title . "...\n";
+			return unless ($sched && defined $extra);
+			$target->empty();
+			my ($error,$server,$img,$lfp) = fetchapic($ti->link,$fill,$stat);
+			return $error if $error;
+			my $viewsize = 325;
+			my $pic = Prima::Image->new;
+			my $lfn = "$lfp$img";
+			$pic->load($lfn);
+			$pr = labelBox($target,$ti->text(),$ti->title(),'V', boxfill => 'both', boxex => 0, labfill => 'x', labex => 1);
+			if (-r $lfp . $img ) {
+				my ($pic,$iz) = showapic($lfp,$img,$viewsize);
+				$pr->insert( ImageViewer =>
+					name => $ti->title(), width => $viewsize, height => $viewsize,
+					pack => {fill => 'none'}, image => $pic);
+				Pfresh();
+			}
+			
+		},
 		onClick => sub {
 			my $pr;
 			if ($sched) {
 				my $fill = 0; # filler variable
+				if ($sched == 2 && defined $extra) {
+					print "Success!";
+					my $x = $extra;
+					my $description = $ti->text();
+					$description =~ s/\s+^//; # trim trailing whitespace
+					$$extra{cbsub}->($$extra{dialog},$$extra{target},$$extra{button},$$extra{ar},$ti->link,$ti->title,$description,$$extra{category},$$extra{date},$$extra{trim});
+					$$extra{control}->destroy(); # kill the chooser
+					$$extra{covers}->show(); # reshow the list
+					my ($sh,$rh) = @{ $$extra{ar} };
+					$$rh{$$extra{category}} = {} unless exists $$rh{$$extra{category}};
+					$$rh{$$extra{category}}{$day} = [] unless exists $$rh{$$extra{category}}{$day};
+					my $h = { url => $ti->link, title => $ti->title, desc => $description };
+					push(@{ $$rh{$$extra{category}}{$day} },$h);
+					return;
+				}
 				$target->empty();
 				my ($error,$server,$img,$lfp) = fetchapic($ti->link,$fill,$stat);
 				return $error if $error;
@@ -1143,10 +1292,11 @@ print ".";
 	Makes a button for each FILE, to load its items into a given TARGET with buttons to copy that item into the PREVIEW and the ARRAYREF. Said items have the option of clearing the PARENT.
 =cut
 sub makeDescButton {
-	my ($lister,$f,$lpane,$preview,$tar,$sched) = @_;
+	my ($lister,$f,$lpane,$preview,$tar,$sched,$extra) = @_;
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched);
+	#							left pane; filename; preview pane; t? array ref; schedule page?
+		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched,$extra);
 		$error && getGUI('status')->push("An error occurred loading $f!"); }, height => $buttonheight, );
 }
 print ".";
@@ -1216,6 +1366,55 @@ sub insertGroupLoaders { # we'll be doing this (placing buttons for loading/crea
 }
 print ".";
 
+sub placeDescLine {
+	my ($page,$stat,$hitserver,$line,$hashr,$orderkey,$viewsize,$buttonheight,$vp,$cap,$ib,$collapsed,$expanded,$moment,$pageitem,$pagenumber,$dtxt,$title) = @_;
+	my ($error,$server,$img,$lfp) = fetchapic($line,$hitserver,$stat,$page);
+	return $error if $error;
+	$page->set( height => $viewsize + 7 );
+	my $row = $page->insert( HBox => name => $img);
+	$$orderkey++; # new order key for each image found.
+	my $okey = sprintf("%04d",$$orderkey);# Friendly name, in string format for use as hash key for keeping image order
+	$$hashr{$okey} = {}; # make a new empty hash for each image
+	$$hashr{$okey}{url} = $line; # Store image url for matching with a description later
+	if (-r $lfp . $img ) {
+# put both of these in a row object, along with the inputline for the description
+		$row->insert( Label => name => "$img", text => "Description for ");
+# replace this with an Image object, so we can set the zom factor and resize the image when the user clicks on it to see it so they can describe it.
+		my ($pic,$iz) = showapic($lfp,$img,$viewsize);
+		my $lfn = "$lfp$img";
+		my $shower = $row->insert( Button => name => "$lfn", text => "$img", height => $buttonheight, ); # button for filename
+		$shower->set( onClick => sub {
+			defined $$vp and $$vp->destroy;
+			$cap->text($shower->text);
+			$$vp = $ib->insert( ImageViewer =>
+				name => "i$img", zoom => $iz, width => $viewsize, height => $viewsize,
+				pack => {fill => 'none'}, image => $pic); $::application->yield(); });
+# put description inputline here.
+	} else {
+		$row->insert( Label => text => "$img could not be loaded for viewing." );
+	}
+	my $nt = $row->insert( InputLine => width => 50, name => "t of $line", text => (defined $title ? "$title" : "$okey") );
+	$nt->set(onLeave => sub { $$hashr{$okey}{title} = $nt->text; });
+	$row->insert( Label => text => ":");
+	my $desc = $row->insert( InputLine => width => 350, name => "$line", text => (defined $dtxt ? $dtxt : "") );
+	$desc->set(onLeave => sub { $$hashr{$okey}{desc} = $desc->text; });
+#	$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store, not by what the button does but by causing the input to lose focus.
+#	$row->height($collapsed);
+	if ($$hitserver) {
+		$stat->push("Waiting...");
+		Pwait($moment,$stat,"Waiting...");
+		$$hitserver = 0;
+	}
+	$$pageitem++;
+#	if ($$pageitem > $groupsof) { # This will only proc if we have more than 10 items, anyway.
+#		$$pageitem -= $groupsof;
+#		$$pagenumber++;
+#		$page = $book[$$pagenumber];
+#	}
+	Pfresh();
+}
+print ".";
+
 sub fetchapic { # fetches an image from the cache, or from the server if it's not there.
 	my ($line,$hitserver,$stat,$target) = @_;
 	$line =~ /(https?:\/\/)?([\w-]+\.[\w-]+\.\w+\/|[\w-]+\.\w+\/)(.*\/)*(\w+\.?\w{3})/;
@@ -1236,7 +1435,7 @@ sub fetchapic { # fetches an image from the cache, or from the server if it's no
 		$$hitserver = 1;
 		$stat->push("Trying to fetch $line ($img)");
 		Pfresh();
-#		print("Trying to fetch $line ($img) to $lfp");
+		print("Trying to fetch $line ($img) to $lfp");
 		my $failure = FIO::Webget($line,"$lfp$img");# get image from server here
 		$failure and defined $target and $target->insert( Label => name => "$img", text => "$img could not be retrieved from server $2.");
 	} else {
@@ -1304,16 +1503,19 @@ sub tryLoadInput {
 	$resettarget->empty(); # clear page.
 	Pfresh(); # redraw UI
 	$resettarget->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, );
-	return 0 unless (Common::findIn($fn,@openfiles) < 0); # don't try to load if already loaded that file.
-	return 0 unless (-e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
+	return 0 unless ($fn eq "NONE" || Common::findIn($fn,@openfiles) < 0); # don't try to load if already loaded that file.
+	return 0 unless ($fn eq "NONE" || -e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
 	my $stat = getGUI('status');
+	my @them;
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
-	$stat->push("Trying to load $fn...");
-	my @them = FIO::readFile($fn,$stat);
-	if ($#them == 0) {
-		$stat->push("Zero lines found in file!");
-	} elsif ($#them == 1) {
-		$stat->push("One line found in file!");
+	unless ($fn eq "NONE") { # trying to load a real file
+		$stat->push("Trying to load $fn...");
+		@them = FIO::readFile($fn,$stat);
+		if ($#them == 0) {
+			$stat->push("Zero lines found in file!");
+		} elsif ($#them == 1) {
+			$stat->push("One line found in file!");
+		}
 	}
 	my $outbox = labelBox($resettarget,"Images",'imagebox','V', boxfill => 'both', boxex => 0, labfill => 'none', labex => 0);
 	my $hb = $outbox->insert( HBox => name => "$fn", pack => {fill => 'x', expand => 1} ); # Left/right panes
@@ -1329,52 +1531,18 @@ sub tryLoadInput {
 	}
 	my $pagenumber = 0;
 	my $pageitem = 0;
-	foreach my $line (@them) {
-		$pageitem++;
-#		if ($pageitem > $groupsof) { # This will only proc if we have more than 10 items, anyway.
-#			$pageitem -= $groupsof;
-#			$pagenumber++;
-#			$page = $book[$pagenumber];
-#		}
-		Pfresh();
-		my ($error,$server,$img,$lfp) = fetchapic($line,\$hitserver,$stat,$page);
-		return $error if $error;
-		my $row = $page->insert( HBox => name => $img);
-		$orderkey++; # new order key for each image found.
-		my $okey = sprintf("%04d",$orderkey);# Friendly name, in string format for use as hash key for keeping image order
-		$$hashr{$okey} = {}; # make a new empty hash for each image
-		$$hashr{$okey}{url} = $line; # Store image url for matching with a description later
-		if (-r $lfp . $img ) {
-# put both of these in a row object, along with the inputline for the description
-			$row->insert( Label => name => "$img", text => "Description for ");
-# replace this with an Image object, so we can set the zom factor and resize the image when the user clicks on it to see it so they can describe it.
-			my ($pic,$iz) = showapic($lfp,$img,$viewsize);
-			my $lfn = "$lfp$img";
-			my $shower = $row->insert( Button => name => "$lfn", text => "$img", height => $buttonheight, ); # button for filename
-			$shower->set( onClick => sub {
-				defined $vp and $vp->destroy;
-				$cap->text($shower->text);
-				$vp = $ib->insert( ImageViewer =>
-					name => "i$img", zoom => $iz, width => $viewsize, height => $viewsize,
-					pack => {fill => 'none'}, image => $pic); $::application->yield(); });
-# put description inputline here.
-		} else {
-			$row->insert( Label => text => "$img could not be loaded for viewing." );
+	unless ($fn eq "NONE") { # real file...
+		foreach my $line (@them) {
+			placeDescLine($page,$stat,\$hitserver,$line,$hashr,\$orderkey,$viewsize,$buttonheight,\$vp,$cap,$ib,$collapsed,$expanded,$moment,\$pageitem,\$pagenumber);
 		}
-		my $nt = $row->insert( InputLine => width => 50, name => "t of $line", text => "$okey" );
-		$nt->set(onLeave => sub { $$hashr{$okey}{title} = $nt->text; });
-		$row->insert( Label => text => ":");
-		my $desc = $row->insert( InputLine => width => 350, name => "$line", text => "" );
-		$desc->set(onLeave => sub { $$hashr{$okey}{desc} = $desc->text; });
-#		$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store, not by what the button does but by causing the input to lose focus.
-#		$row->height($collapsed);
-		if ($hitserver) {
-			$stat->push("Waiting...");
-			Pwait($moment);
-			$hitserver = 0;
-		}
+	} else { # manual entry
+		$outbox->insert( Button => text => "Add an image", onClick => sub {
+			my %ans = PGK::askbox($outbox,"Enter Image Details",{},"url","URL:","title","Title:","desc","Description:");
+			return -1 unless (exists $ans{url} and $ans{url} ne '');
+			placeDescLine($page,$stat,\$hitserver,$ans{url},$hashr,\$orderkey,$viewsize,$buttonheight,\$vp,$cap,$ib,$collapsed,$expanded,$moment,\$pageitem,\$pagenumber,$ans{desc},$ans{title});
+		} );
 	}
-	my $of = $outbox->insert( InputLine => text => "prayers.dsc", pack => { fill => 'x', expand => 0, },);
+	my $of = $outbox->insert( InputLine => text => ($fn eq "NONE" ? "manual.dsc" : "prayers.dsc"), pack => { fill => 'x', expand => 0, },);
 	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 0, }, onClick => sub { my $ofn = $of->text; $ofn =~ s/\..+$//; $ofn = "$ofn.dsc"; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn."); $resettarget->insert( Label => text => "Your file has been saved.", pack => {fill => 'both', expand => 1}); $resettarget->insert( Button => text => "Continue to Grouping tab", onClick => sub { getGUI('pager')->switchToPanel("Grouping"); } ); $resettarget->insert( Button => text => "Continue to Scheduling tab", onClick => sub { getGUI('pager')->switchToPanel("Scheduling"); } ); $resettarget->insert( Label => text => scalar %$hashr . " images.", pack => {fill => 'both', expand => 1}); });
 	$stat->push("Done.");
 	return 0; # success!
@@ -1438,6 +1606,9 @@ sub resetDescribing {
 			$error and sayBox(getGUI("mainWin"),"An error occurred trying to load $f.\nPlease check the file to ensure it contains valid URLS, one on each line.");
 		});
 	}
+	$lister->insert( Button => text => "Enter URLS Manually", onClick => sub { $lister->destroy();
+		my $error = tryLoadInput($imgpage,"NONE",$delaybox,\%images,$sizer);
+	});
 	$delaybox->text("7");
 	return 0;
 }

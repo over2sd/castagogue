@@ -4,20 +4,20 @@ use warnings;
 #use diagnostics;
 use utf8;
 
-use Data::Dumper; # TODO: Remove this diagnostic line
+use Getopt::Long;
+use lib "./modules/";
+use skrDebug;
 
 # castapic
 #######  This will be an app that takes a file of image URLs and lets the user type in a description for each, then save those descriptions into another file.
 ####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
 
 my $PROGRAMNAME = "Castapic";
-my $version = "0.020a";
+my $version = "0.021a";
 
-$|++; # Immediate STDOUT, maybe?
 print "[I] $PROGRAMNAME v$version is running.";
 flush STDOUT;
 
-use Getopt::Long;
 my $conffilename = 'config.ini';
 my $debug = 0; # verblevel
 sub howVerbose { return $debug; }
@@ -32,7 +32,6 @@ GetOptions(
 	'verbose|v' => \$debug,
 );
 
-use lib "./modules/";
 print "\n[I] Loading modules...";
 
 require Sui; # My Data stores

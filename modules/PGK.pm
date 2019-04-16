@@ -1180,12 +1180,19 @@ sub Pwait {
 	my $duration = shift or 1;
 	my $start = time();
 	my $end = ($start+$duration);
+	my $stat = shift or undef;
+	my $msg = shift or "";
 	while ($end > time()) {
 		Pfresh();
 		# 10ms sleep.
 		# Not much, but prevents processor spin without making waiting dialogs unresponsive.
+		if (defined $stat) {
+			my $text = "$msg " . ($end - time());
+			$stat->push("$text");
+		}
 		select(undef,undef,undef,0.01);
 	}
+	$stat and $stat->push("");
 	return 0;
 }
 print ".";
