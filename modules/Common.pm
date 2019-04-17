@@ -787,7 +787,7 @@ sub dateConv {
 	my $date = shift;
 	if (ref($date) eq "DateTime") {
 		$date->ymd =~ /(\d\d\d\d)-(\d\d)-(\d\d)/;
-		return ($1,$2,$3);
+		return ($date,$1,$2,$3); # have same return values as other input
 	} else {
 		$date =~ /(\d\d\d\d)-(\d\d)-(\d\d)/;
 		my $source = lineNo();

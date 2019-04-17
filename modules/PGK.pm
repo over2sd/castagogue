@@ -1719,6 +1719,7 @@ sub quickBox {
 	my $extras = { pack => { side => 'bottom', fill => 'x' },};
 	my $fresh = Prima::MsgBox::insert_buttons( $askbox, $buttons, $extras); # not reinventing wheel
 print "but: " . ref($fresh) . "...";
+	$askbox->{mybuttons} = $fresh;
 	return $askbox;
 }
 print ".";

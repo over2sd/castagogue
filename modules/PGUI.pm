@@ -34,13 +34,10 @@ my @openfiles = [];
 
 #-=-=-=-=-=-=-=-=-=-=-=-=- Executor start
 sub hashAndPic {
-	my ($us,$ts,$ds,$cs,$sh,$rh,$day,$tarobj,$parobj) = @_;
+	my ($us,$ts,$ds,$cs,$sh,$rh,$date,$tarobj,$parobj) = @_;
 	# also, store values in scheduled hash
+	my ($x1,$x2,$x3,$day) = Common::dateConv($date);
 	$$sh{url} = $us; $$sh{title} = $ts; $$sh{desc} = $ds;
-	$$rh{$cs} = {} unless exists $$rh{$cs};
-	$$rh{$cs}{$day} = [] unless exists $$rh{$cs}{$day};
-	my $h = { url => $us, title => $ts, desc => $ds };
-	push(@{ $$rh{$cs}{$day} },$h);
 	$parobj->close();
 	my $x = 0;
 	return PGK::buttonPic($tarobj,$us,\$x);
@@ -92,7 +89,7 @@ sub chooseDayImage  {
 		$$rh{$cat}{$day} = [] unless exists $$rh{$cat}{$day};
 		my $h = { url => $u, title => $t, desc => $d };
 		push(@{ $$rh{$cat}{$day} },$h);
-		myButton($parent,$row,$target,$mar,$u,$t,$d,$cat,$date,$l);
+		myButton($parent,$row,$target,$mar,$u,$t,$d,$cat,$date,$l,1);
 		return 1;
 	}
 	#------------------------------------Callback End
@@ -102,16 +99,22 @@ sub chooseDayImage  {
 	$box->{count}++; # library button gets counted.
 	#================================== Button Start
 	sub myButton {
-		my ($parent,$row,$target,$mar,$u,$t,$d,$cat,$date,$l) = @_;
+		my ($parent,$row,$target,$mar,$u,$t,$d,$cat,$date,$l,$newchoice) = @_;
 		print Common::lineNo();
 		my ($sch,$rgh) = @$mar;
-		my ($y,$m,$day) = Common::dateConv($date);
+		my ($dt,$y,$m,$day) = Common::dateConv($date);
 		$$sch{$cat} = {} unless exists $$sch{$cat};
 		$$sch{$cat}{"$y-$m-$day"} = {} unless exists $$sch{$cat}{"$y-$m-$day"};
 		my $s = $$sch{$cat}{"$y-$m-$day"};
 		$row->insert( Button => text => Common::shorten($t,($l or 20),4), onClick => sub {
-			hashAndPic($u,$t,$d,$cat,$s,$rgh,$day,$target,$parent);
+			hashAndPic($u,$t,$d,$cat,$s,$rgh,$date,$target,$parent);
 		} );
+		if ( $newchoice ) {
+			$$rgh{$cat} = {} unless exists $$rgh{$cat};
+			$$rgh{$cat}{$day} = [] unless exists $$rgh{$cat}{$day};
+			my $h = { url => $u, title => $t, desc => $d };
+			push(@{ $$rgh{$cat}{$day} },$h);
+		}
 		$parent->{count}++;
 		if ($parent->{count} > 3) {
 			$parent->{count} = 0;
@@ -120,7 +123,7 @@ sub chooseDayImage  {
 	}
 	#===================================== Button End
 	$target->insert( Button => text => "Add from library", onClick => sub {
-		devHelp($box,"Adding from the library"); return;
+#devHelp($box,"Adding from the library"); return;
 		$box->{mybox}->hide();
 		my $stage = $box->insert( HBox => name => "stager", pack => { fill => 'both' }, );
 		my $chooser = $stage->insert( VBox => name => "chooser");
@@ -130,6 +133,7 @@ sub chooseDayImage  {
 		my $sched = 2;
 		my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
 		$stage->insert(Label => text => " ", pack => { fill => 'both', expand => 1, }, );
+		$box->{mybox}->insert( Label => text => "Choosing an image to add as an option for the $dayth of the month." );
 		# on click, destroy this box and list images in DSC file
 		# on click, destroy that box and add button to $target with myButton
 		# make sure this new image gets added to the regular list (calendar.txt)
@@ -146,6 +150,7 @@ sub chooseDayImage  {
 			control => $stage,
 			dialog => $box,
 			trim => $tl,
+			newchoice => 1,
 		};
 		refreshDescList($chooser,$prev,$tar,$sched,$extra);
 	} );
@@ -154,7 +159,7 @@ print "Day: $day -=- ";
 skrDebug::dump($$rgh{$cat});
 	foreach my $i ( @{ $$rgh{$cat}{$day} } ) {
 		# display a button for each
-		myButton($box,$target,$b,$ar,$$i{url},$$i{title},$$i{desc},$cat,$x,$tl);
+		myButton($box,$target,$b,$ar,$$i{url},$$i{title},$$i{desc},$cat,$x,$tl,0);
 		# when the button is pressed, select it as the image for the given button and close the dialog
 	}
 	$box->execute();
@@ -189,7 +194,7 @@ sub showMonth {
 		$pos++;
 	}
 	my ($schedh,$regh) = @$far;
-	my ($y,$m,$x) = Common::dateConv($date); # DateTime => (scalar,scalar,scalar)
+	my ($x1,$y,$m,$x2) = Common::dateConv($date); # DateTime => (datetime,scalar,scalar,scalar)
 	foreach my $d (1 .. $days_in_months[$date->month - 1]) {
 		my $row = $weeks[$w];
 		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, name => "$y-$m-$d", text => "$d", onClick => sub { chooseDayImage($_[0],$weeks[$w],"$y-$m-$d",$cat,$far,$butsize,0); } );
@@ -279,6 +284,12 @@ skrDebug::dump(\%ex);
 			my %dates = %{ $hash{$c} };
 			foreach my $d (sort keys %dates ) {
 				my %fields = %{ $hash{$c}{$d} };
+				unless (defined $fields{url} && defined $fields{title} && defined $fields{desc} ) {
+					my $es = "Subject hash does not contain all required data " . Common::lineNo(2);
+					print "$es\n";
+					$stat->push($es);
+					next;
+				}
 				$fields{desc} =~ s/\s+^//; # trim trailing whitespace
 				push(@lines,"date=" . $d . ">image=" . $fields{url} . ">title=" . $fields{title} . ">desc=" . $fields{desc} . ">time=" . $timestr . ">cat=" . $c . ">");
 			}
@@ -287,14 +298,23 @@ skrDebug::dump(\%ex);
 		$stat->push($err ? "Error when saving: $!" : "Schedule saved.");
 		$_[0]->text("Saving calendar...");
 		Pfresh();
+		@lines = ();
 		$fn = "schedule/calendar.txt";
 		%hash = %{ @{ $filarrref }[1] };
 		foreach my $c ( sort keys %hash ) {
 			my %dates = %{ $hash{$c} };
 			foreach my $d (sort keys %dates ) {
-				my %fields = %{ $hash{$c}{$d} };
-				push(@lines,"day=" . $d . ">image=" . $fields{url} . ">title=" . $fields{title} . ">desc=" . $fields{desc} . ">time=" . $timestr . ">cat=" . $c . ">");
+				foreach my $i ( @{ $hash{$c}{$d} } ) {
+					my %fields = %{ $i };
+					unless (defined $fields{url} && defined $fields{title} && defined $fields{desc} ) {
+						my $es = "Subject hash does not contain all required data " . Common::lineNo(2);
+						print "$es\n";
+						$stat->push($es);
+						next;
+					}
+					push(@lines,"day=" . $d . ">image=" . $fields{url} . ">title=" . $fields{title} . ">desc=" . $fields{desc} . ">time=" . $timestr . ">cat=" . $c . ">");
 print Dumper $filarrref;
+				}
 			}
 		}
 		$err = FIO::writeLines($fn,\@lines,1);
@@ -521,6 +541,12 @@ sub saveSequence {
 	$stat->push("Writing sequence...");
 	foreach my $i (@_) {
 		next unless (ref $i eq "RItem"); # make sure we only use RItems.
+		unless (defined $i->link && defined $i->title && defined $i->text) {
+			my $es = "Subject RItem does not contain all required data " . Common::lineNo(2);
+			print "$es\n";
+			$stat->push($es);
+			next;
+		}
 		print "\n " . $i->link() . ": " . $i->text() . " @" . $i->time() . " (" . $i->cat() . ")";
 		push(@lines,"image=" . $i->link . ">title=" . $i->title . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">");
 	}
@@ -562,6 +588,12 @@ sub saveDatedSequence {
 		next if ($l++ > $end);
 #		print "$l,";
 		next unless (ref $i eq "RItem"); # make sure we only use RItems.
+		unless (defined $i->link && defined $i->title && defined $i->text) {
+			my $es = "Subject RItem does not contain all required data " . Common::lineNo(2);
+			print "$es\n";
+			$stat->push($es);
+			next;
+		}
 #		print "\ndate=" . $date->ymd() . ">image=" . $i->link . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">";
 		push(@lines,"date=" . $date->ymd() . ">image=" . $i->link . ">title=" . $i->title . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">");
 		$date += DateTime::Duration->new( days=> 1 );
@@ -1101,6 +1133,7 @@ sub tryLoadDesc {
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$stat->push("Processing " . scalar @them . " lines...");
 	my $ti = RItem->new();
+### TODO: Add code here to make columns if too many images in file
 	foreach my $line (@them) {
 		chomp $line;
 		$line =~ m/(.*?\=)?(.*)/; # find keywords
@@ -1128,8 +1161,7 @@ sub tryLoadDesc {
 				onMouseEnter=> sub {
 					my $pr;
 					my $fill = 0; # filler variable
-					print "Mouse over " . $pi->title . "...\n";
-					return unless ($sched && defined $extra);
+					return unless ($sched > 1 && defined $extra);
 					$target->empty();
 					my ($error,$server,$img,$lfp) = fetchapic($pi->link,$fill,$stat);
 					return $error if $error;
@@ -1154,14 +1186,15 @@ sub tryLoadDesc {
 						if ($sched == 2 && defined $extra) {
 							my $description = $pi->text();
 							$description =~ s/\s+^//; # trim trailing whitespace
-							$$extra{cbsub}->($$extra{dialog},$$extra{target},$$extra{button},$$extra{ar},$pi->link,$pi->title,$description,$$extra{category},$$extra{date},$$extra{trim});
+							$$extra{cbsub}->($$extra{dialog},$$extra{target},$$extra{button},$$extra{ar},$pi->link,$pi->title,$description,$$extra{category},$$extra{date},$$extra{trim},$$extra{newchoice});
 							$$extra{control}->destroy(); # kill the chooser
 							$$extra{covers}->show(); # reshow the list
-							my ($sh,$rh) = @{ $$extra{ar} };
-							$$rh{$$extra{category}} = {} unless exists $$rh{$$extra{category}};
-							$$rh{$$extra{category}}{$day} = [] unless exists $$rh{$$extra{category}}{$day};
-							my $h = { url => $pi->link, title => $pi->title, desc => $description };
-							push(@{ $$rh{$$extra{category}}{$day} },$h);
+### TODO: Remove this in favor of using callback to do it
+#							my ($sh,$rh) = @{ $$extra{ar} };
+#							$$rh{$$extra{category}} = {} unless exists $$rh{$$extra{category}};
+#							$$rh{$$extra{category}}{$day} = [] unless exists $$rh{$$extra{category}}{$day};
+#							my $h = { url => $pi->link, title => $pi->title, desc => $description };
+#							push(@{ $$rh{$$extra{category}}{$day} },$h);
 							return;
 						}
 						$target->empty();
@@ -1210,8 +1243,7 @@ sub tryLoadDesc {
 		onMouseEnter=> sub {
 			my $pr;
 			my $fill = 0; # filler variable
-			print "Mouse over " . $ti->title . "...\n";
-			return unless ($sched && defined $extra);
+			return unless ($sched > 1 && defined $extra);
 			$target->empty();
 			my ($error,$server,$img,$lfp) = fetchapic($ti->link,$fill,$stat);
 			return $error if $error;
