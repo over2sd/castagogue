@@ -32,6 +32,21 @@ package PGUI;
 
 my @openfiles = [];
 
+sub buildPageOf { # start of button populator. I need to have a generic version of this for the Pager class.
+	my ($target,$count,$offset,@list) = @_;
+	my $length = scalar @list -1;
+	unless ($length >= $count + $offset) { # prevent making items beyond what has been given
+		unless ($length < $offset) {
+			$count = scalar @list - $offset;
+		} else {
+			$count = 0;
+		}
+	}
+	foreach my $i ($offset..$offset + $count) {
+		$target->insert(Button => text => $list[$i] );
+	}
+}
+
 #-=-=-=-=-=-=-=-=-=-=-=-=- Executor start
 sub hashAndPic {
 	my ($us,$ts,$ds,$cs,$sh,$rh,$date,$tarobj,$parobj) = @_;
@@ -123,6 +138,8 @@ sub chooseDayImage  {
 	}
 	#===================================== Button End
 	$target->insert( Button => text => "Add from library", onClick => sub {
+	
+### MAKE THIS use Pager with buttons
 #devHelp($box,"Adding from the library"); return;
 		$box->{mybox}->hide();
 		my $stage = $box->insert( HBox => name => "stager", pack => { fill => 'both' }, );

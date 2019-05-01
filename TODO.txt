@@ -9,6 +9,17 @@ Fix error that results in failure to delete some old items.
 Make sure I didn't reinvent the wheel with my row processing (might be better to have used RRGroup).
 figure out why my attempt to check titles before adding RSS objects didn't work.
 Try Pager, VBoxE, etc, for pagify function.
+	buildPageOf(t,n,o,a)
+		populates box t with n items from array a (offset o), then puts appropriate left-right buttons.
+		next/previous buttons call Pager::adjacent(up/down)
+			On first call of each page, buildPageOf(n,o,a) is called as switch action, then switch action is set to "sub { me->show(); }"
+			On each call, after adjacent, thispage->hide() is called.
+	buildNpages(t,n,stepturn)
+		divides t by n for d (dividend) and calls buildPageOf(d,0) once or n times, depending on 'stepturn' argument.
+		stepturn argument can be pulled from a new savemem flag in Pager
+	Pager control == "columns" makes columns using buildNPages or buildPageOf without buttons ( or if a switchaction is given, with a button to hide all others and make this column exclusive)
+		exclusion button creates a collapse button, then runs switch action.
+	Pager control == "directory" makes buttons for sub-Pagers, divided by some arbitrary division, e.g. alphabet A,B,C,...W-Z; 202,318,850,904; a list that Pager uses, slotting records (not necessarily sorted) into based on a regex of /^Label/.
 When an image is clicked, it'll open a window with a large version of that image.
 Regex out %d and other sprintf-decoded strings with \%.
 Make Scheduling page's button creator read the titles, not the description, unless the titles are numerics AND have duplication.

@@ -986,7 +986,8 @@ Page set object with a means to switch between them.
 
 =head3 Usage
 
- my $pages = $parent->insert( Pager => name => 'pager', control => 'list' );
+ my $pages = $parent->insert( Pager => name => 'pager');
+ $pages->control('list');
  $pages->build('page1','page2','page3');
  
 =head3 Methods
@@ -1006,6 +1007,7 @@ sub profile_default {
 		order => {}, # value/page pairs
 		panels => undef, # container for panels
 		control => 'list', # list control
+		savemem => 0, # if true, load only the current page of things
 	);
 	@$def{keys %prf} = values %prf;
 	return $def;
@@ -1013,7 +1015,7 @@ sub profile_default {
 
 sub init {
 	my $self = shift;
-	foreach (qw( pagecount )) {
+	foreach (qw( pagecount savemem )) {
 		$self->{$_} = 0;
 	}
 	foreach (qw( pages tabs )) {
@@ -1037,20 +1039,23 @@ Builds the necessary parts of the panel set.
 sub build {
 	my ($self,@tabs) = @_;
 	$self->{tabs} = \@tabs;
-	unless (scalar @{ $self->{tabs} } ) {
-		print "[E] You cannot build this without any tabs!\n";
-		return -1;
+	if ($self->{control} eq "directory") {
+	} elsif ($self->{control} eq "columns") {
 	} elsif ($self->{control} eq "buttons") {
 		my $topbot = $self->SUPER::insert( VBox => name => "htov", pack => { fill => 'both', expand => 1, } );
 		$self->{panels} = $topbot->insert( VBoxE => name => 'panelholder', pack => { fill => 'both', expand => 1, } );
-		$self->{selector} = $topbot->insert( HBox => pack => { fill => 'y', expand => 0, padx => 5}, editProfile => {visible => 0});
+		$self->{selector} = $topbot->insert( HBox => pack => { fill => 'y', expand => 0, padx => 5}, editProfile => {visible => 1});
 		# connect each page to a value in the dropbox:
 		my ($starter,$upper,$downer,$ender);
 		$starter = $self->{selector}->insert( Button => text => "|<", height => 28, onClick => sub { $self->switchToPanel($self->{tabs}[0]); ($self->{index} == $self->pageCount(-1)) and $upper->hide() or $upper->show(); ($self->{index} == 0) and $ender->hide() or $ender->show(); }, );
 		$downer = $self->{selector}->insert( Button => text => "<", height => 28, onClick => sub { $self->adjacent("down"); ($self->{index} == $self->pageCount(-1)) and $upper->hide() or $upper->show(); ($self->{index} == 0) and $ender->hide() or $ender->show(); }, );
-		$upper = $self->{selector}->insert( Button => text => ">", height => 28, onClick => sub { $self->adjacent("down"); ($self->{index} == 0) and $downer->hide() or $downer->show(); ($self->{index} == $self->pageCount(-1)) and $starter->hide() or $starter->show(); }, );
+		$upper = $self->{selector}->insert( Button => text => ">", height => 28, onClick => sub { $self->adjacent("up"); ($self->{index} == 0) and $downer->hide() or $downer->show(); ($self->{index} == $self->pageCount(-1)) and $starter->hide() or $starter->show(); }, );
 		$ender = $self->{selector}->insert( Button => text => ">|", height => 28, onClick => sub { $self->switchToPanel($self->{tabs}[-1]); ($self->{index} == 0) and $downer->hide() or $downer->show(); ($self->{index} == $self->pageCount(-1)) and $starter->hide() or $starter->show(); }, );
 	} else { # build row for dropbox (control = "list")
+		unless (scalar @{ $self->{tabs} } ) {
+			print "[E] You cannot build this without any tabs!\n";
+			return -1;
+		}
 		$self->{selector} = $self->SUPER::insert( ComboBox => style => cs::Simple, text => $self->{tabs}[0], items => $self->{tabs}, pack => { fill => 'y', expand => 0, padx => 5}, editProfile => {visible => 0});
 		$self->{panels} = $self->SUPER::insert( VBoxE => name => 'panelholder', pack => { fill => 'both', expand => 1, } );
 		# connect each page to a value in the dropbox:
@@ -1075,7 +1080,7 @@ sub adjacent {
 		$index = $self->pageCount() if $index <= 0;
 		$index--;
 	} elsif ($dir =~ /[1|up|u]/) {
-		$index = -1 if $index >= $self->pagecount(-1);
+		$index = -1 if $index >= $self->pageCount(-1);
 		$index++;
 	} else {
 		warn "\n[W] An invalid direction was given to Pager::adjacent(): '$dir'";
@@ -1114,10 +1119,17 @@ sub insert {
 sub insert_to_page {
 	my $self  = shift;
 	my $page  = shift;
-	$page = $self-> {pagecount} if $page > $self-> {pageCount} || $page < 0;
+	$page = $self-> {pagecount} if ($page > $self-> {pageCount} || $page < 0);
 
 	my $child = $self->{panels}->insert(@_); # create the child
-	$self->{pages}[$page] = $child;
+	if ($page == $self->{pagecount}) {
+		print "Adding page $page / " . $self->{pagecount} . "...";
+		push(@{ $self->{pages} },$child); # insert child
+		push(@{ $self->{tabs} },($child->name or "unnamed$page")); # insert child's name
+		$self->{order}{($child->name or "unnamed$page")} = $page; # insert child's position
+	} else {
+		$self->{pages}[$page] = $child;
+	}
 	$child->send_to_back();
 	$self-> {pagecount}++;
 #	my @tabs = @{ $self->{tabs} };
