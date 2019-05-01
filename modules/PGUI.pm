@@ -32,8 +32,19 @@ package PGUI;
 
 my @openfiles = [];
 
+=item buildPageOf TARGET COUNT OFFSET EXTRAS LIST
+
+Populates a TARGET container widget with up to COUNT objects from a LIST, starting with the OFFSETth item, if possible.
+Expects EXTRAS to be a hashref that contains, at minimum:
+*	action => reference of a subroutine that creates specialized objects to insert into the TARGET.
+	and generally also:
+*	preargs => an arrayref containing commonly applied arguments that go before the iterative argument
+*	postargs => an arrayref containing commonly applied arguments that go after the iterative argument
+
+=cut
+
 sub buildPageOf { # start of button populator. I need to have a generic version of this for the Pager class.
-	my ($target,$count,$offset,@list) = @_;
+	my ($target,$count,$offset,$extras,@list) = @_;
 	my $length = scalar @list -1;
 	unless ($length >= $count + $offset) { # prevent making items beyond what has been given
 		unless ($length < $offset) {
@@ -143,6 +154,7 @@ sub chooseDayImage  {
 #devHelp($box,"Adding from the library"); return;
 		$box->{mybox}->hide();
 		my $stage = $box->insert( HBox => name => "stager", pack => { fill => 'both' }, );
+		$stage->insert( Label => text => "Choosing an image to add as an option for the $dayth of the month." );
 		my $chooser = $stage->insert( VBox => name => "chooser");
 		$chooser->insert( Label => text => "Choose a file of image descriptions:");
 		# list DSC files in library
@@ -150,7 +162,6 @@ sub chooseDayImage  {
 		my $sched = 2;
 		my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
 		$stage->insert(Label => text => " ", pack => { fill => 'both', expand => 1, }, );
-		$box->{mybox}->insert( Label => text => "Choosing an image to add as an option for the $dayth of the month." );
 		# on click, destroy this box and list images in DSC file
 		# on click, destroy that box and add button to $target with myButton
 		# make sure this new image gets added to the regular list (calendar.txt)
@@ -1114,13 +1125,14 @@ sub refreshDescList {
 	my $lister = $resettarget->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") ); # make new list box
 	$lister->insert( Label => text => "Choose a description file:"); # Title the new box
 	my $stat = getGUI("status");
-	my $text = "building buttons..";
+	my $text = "Building buttons..";
+### TODO: Convert to Pager function
 	foreach my $f (@files) {
 			$stat->push($text);
 			makeDescButton($lister,$f,$resettarget,$target,$ar,$sched,$extra);
 			$text = "$text.";
 	}
-	$stat->push("Done. Pick a file.");
+	$stat->push(Common::shorten($text,50,3) . "Done. Pick a file.");
 	return 0;
 }
 print ".";
@@ -1146,11 +1158,15 @@ sub tryLoadDesc {
 	} elsif ($#them == 1) {
 		$stat->push("One line found in file!");
 	}
+#	my $count = processDesc($ar,$resettarget,$sched,$extra,$target,$stat,@them);
+### TODO: Add code here to make columns if too many images in file
+### TODO: Convert to Pager function
+#sub processDesc {
+#	my ($ar,$resettarget,$sched,$extra,$target,$stat,@them) = @_;
 	my $count = 0;
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$stat->push("Processing " . scalar @them . " lines...");
 	my $ti = RItem->new();
-### TODO: Add code here to make columns if too many images in file
 	foreach my $line (@them) {
 		chomp $line;
 		$line =~ m/(.*?\=)?(.*)/; # find keywords
@@ -1212,7 +1228,7 @@ sub tryLoadDesc {
 #							$$rh{$$extra{category}}{$day} = [] unless exists $$rh{$$extra{category}}{$day};
 #							my $h = { url => $pi->link, title => $pi->title, desc => $description };
 #							push(@{ $$rh{$$extra{category}}{$day} },$h);
-							return;
+							return $count;
 						}
 						$target->empty();
 						my ($error,$server,$img,$lfp) = fetchapic($pi->link,$fill,$stat);
@@ -1254,6 +1270,9 @@ sub tryLoadDesc {
 		}
 #defined $debug and print "\n $k = $2...";
 	}
+# return $count;
+#}
+#### End of subroutine segment?
 	$resettarget->insert( Button => # place button for adding... one final button.
 		text => ($sched ? "Use " : "Add ") . Common::shorten($ti->title(),24,10),
 		height => $buttonheight,
