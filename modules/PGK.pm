@@ -1163,6 +1163,114 @@ sub setSwitchAction {
 	}
 }
 
+package FilePager;
+=head2 FilePager
+
+Page set object that takes a directory and displays a Pager containing buttons, one for each file in the directory
+
+=head3 Usage
+
+ my $pages = $parent->insert( FilePager => name => 'list files');
+ $pages->build( mask => 'txt', dir => '/www/html/lists');
+ 
+=head3 Methods
+
+=cut
+
+use vars qw(@ISA);
+@ISA = qw(Pager);
+
+sub profile_default {
+	my $def = $_[ 0]-> SUPER::profile_default;
+	my %prf = (
+		dir => './', # Location to scan
+		mask => 'txt', # filetype to find
+		savemem => 0, # if true, load only the current page of things
+	);
+	@$def{keys %prf} = values %prf;
+	return $def;
+}
+
+sub init {
+	my $self = shift;
+	my %profile = $self-> SUPER::init(@_);
+	return %profile;
+}
+
+sub pagelen {
+	my ($self,$val) = @_;
+	if (defined $val) { $self->{pagelen} = $val } else { return $self->{pagelen} };
+}
+
+sub mask {
+	my ($self,$mask) = @_;
+	if (defined $mask) { $self->{mask} = $mask } else { return $self->{mask} };
+}
+
+sub dir {
+	my ($self,$val) = @_;
+	if (defined $val) { $self->{dir} = $val } else { return $self->{dir} };
+}
+
+sub build {
+	my ($self,%prf) = @_;
+	PGK::grow($self, boxfill => 'y', boxex => 1, margin => 7);
+	$self->pagelen($prf{pagelen} or 100);
+	$self->mask($prf{mask}) if defined ($prf{mask});
+	$self->mask('txt') unless defined ($self->{mask});
+	$self->dir($prf{dir}) if defined ($prf{dir});
+	$self->dir('.') unless defined ($self->{dir});
+	$self->control($prf{control} or 'buttons');
+	$self->{bg} = ($prf{bgcol} or 14);
+	return -1 unless (defined $self->{dir} and defined $self->{mask} and defined $prf{action} and (ref($prf{action}) eq "CODE")); # require directory and mask, even if just the defaults, as well as a callback reference.
+	my @files = FIO::dir2arr($self->dir,$self->mask); # get the list
+	$self-> SUPER::build();
+	my $pages = int( scalar @files / $self->pagelen() );
+	$pages += 1 unless ( scalar @files <= $pages * $self->pagelen);
+	print "Making $pages pages of " . $self->pagelen . " files (" . scalar @files . " total).\n" if main::howVerbose();
+	my $bgcol = PGK::convertColor(Common::getColors($self->{bg},1,1));
+	my $curr = 0;
+	my $p = $self->get_parent();
+
+	my $a = $self->insert_to_page(0,VBox => name => "page0", backColor => $bgcol, pack => { fill => 'both', expand => 1, } );
+	buildPageOf($p,$a,$prf{action},$self->pagelen,0,@files);
+	foreach my $c (1 .. $pages -1) {
+		next if $c > $pages;
+		$a = $self->insert_to_page($c,VBox => name => "page$c", backColor => $bgcol, pack => { fill => 'both', expand => 1, } );
+		$self->setSwitchAction("page$c",sub { buildPageOf($p,$a,$prf{action},$self->pagelen,$c * $self->pagelen,@files); $self->setSwitchAction("page$c",sub {}); });
+	}
+
+
+	sub buildPageOf {
+		my ($parent,$target,$action,$count,$offset,@list) = @_;
+		$target->insert( Label => text => "( $offset .. " . ($offset + $count) . ")");
+		my $length = scalar @list -1;
+		unless ($length >= $count + $offset) {
+			unless ($length < $offset) {
+				$count = scalar @list - $offset;
+			} else {
+				$count = 0;
+			}
+		}
+		my $buttonheight = (FIO::config('UI','buttonheight') or 18);
+		foreach my $i ($offset..$offset + $count - 1) {
+			PGK::grow($target->insert(Button => text => $list[$i], onClick => sub { $action->($list[$i],$parent) }, ),boxfill => 'x', boxex => 0, marginx => 7, marginy => 0, height => $buttonheight);
+		}
+	}
+	
+	print "Done";
+
+}
+
+sub test {
+	my $self = shift;
+	$self->mask('txt') unless defined ($self->{mask});
+	$self->dir('.') unless defined ($self->{dir});
+	print "My name is " . $self->name . ".\n";
+	print "I'm going to build a file list of " . $self->{mask} . " files in " . $self->{dir} . ".\n";
+	print "My style is " . $self->{control} . ".\n";
+}
+
 =item SBox
 
 =cut
@@ -1328,6 +1436,7 @@ sub createMainWin {
 	);
 	my ($t,$l) = ((FIO::config('Main','top') or 30),(FIO::config('Main','left') or 40));
 	$window->place( x => $l, rely => 1, y=> -$t, anchor => "nw");
+	$window->set( backColor => PGK::convertColor(Common::getColors(14,1,1)) ); # white background
 	$window->onClose( sub {
 		FIO::writeLines("notes.txt",$windowset{notes},1); # save notes, replacing file.
 		FlexSQL::closeDB() if (FIO::config('DB','FlexSQLisloaded') == 1);
@@ -1865,6 +1974,12 @@ sub buttonPic {
 		$button->image($pic);
 	}
 	return 0;
+}
+print ".";
+
+sub grow {
+	my ($w,%args) = @_;
+	$w->pack( fill => ($args{boxfill} or 'none'), expand => (defined $args{boxex} ? $args{boxex} : 1), padx => (defined $args{marginx} ? $args{marginx} : (defined $args{margin} ? $args{margin} : 1)), pady => (defined $args{marginy} ? $args{marginy} : (defined $args{margin} ? $args{margin} : 1)), );
 }
 print ".";
 

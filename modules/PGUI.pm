@@ -1120,18 +1120,26 @@ sub refreshDescList {
 	my ($resettarget,$target,$ar,$sched,$extra) = @_;
 	$resettarget->empty(); # clear the box
 #	print ")RT: " . $resettarget->name . "...";
+	my $fb = $resettarget->insert( FilePager => name => 'descriptionFileList',);
 	my $odir = (FIO::config('Disk','rotatedir') or "lib"); # pick the directory
-	my @files = FIO::dir2arr($odir,"dsc"); # get the list
-	my $lister = $resettarget->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") ); # make new list box
-	$lister->insert( Label => text => "Choose a description file:"); # Title the new box
+	my $pagelen = (FIO::config('UI','filecount') or 15); # How many lines of files to display
+#	my @files = FIO::dir2arr($odir,"dsc"); # get the list
+#	my $lister = $resettarget->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") ); # make new list box
+	$resettarget->insert( Label => text => "Choose a description file:"); # Title the new box
 	my $stat = getGUI("status");
 	my $text = "Building buttons..";
+	$files->build(control => 'buttons', mask => 'dsc', dir => $odir, action => \&makeButton, pagelen => $pagelen);
+	sub makeButton {
+		my ($f,$ex) = @_;
+	my ($lister,$f,$lpane,$preview,$tar,$sched,$extra) = @_;
+		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched,$extra);
+		$error && getGUI('status')->push("An error occurred loading $f!"); }, height => $buttonheight, );
 ### TODO: Convert to Pager function
-	foreach my $f (@files) {
-			$stat->push($text);
-			makeDescButton($lister,$f,$resettarget,$target,$ar,$sched,$extra);
-			$text = "$text.";
-	}
+#	foreach my $f (@files) {
+#			$stat->push($text);
+		makeDescButton($g,$f,$resettarget,$target,$ar,$sched,$extra);
+#			$text = "$text.";
+#	}
 	$stat->push(Common::shorten($text,50,3) . "Done. Pick a file.");
 	return 0;
 }
@@ -1196,7 +1204,7 @@ sub tryLoadDesc {
 					my $fill = 0; # filler variable
 					return unless ($sched > 1 && defined $extra);
 					$target->empty();
-					my ($error,$server,$img,$lfp) = fetchapic($pi->link,$fill,$stat);
+					my ($error,$server,$img,$lfp) = fetchapic($pi->link,\$fill,$stat);
 					return $error if $error;
 					my $viewsize = 325;
 					my $pic = Prima::Image->new;
@@ -1231,7 +1239,7 @@ sub tryLoadDesc {
 							return $count;
 						}
 						$target->empty();
-						my ($error,$server,$img,$lfp) = fetchapic($pi->link,$fill,$stat);
+						my ($error,$server,$img,$lfp) = fetchapic($pi->link,\$fill,$stat);
 						return $error if $error;
 						my $viewsize = 325;
 						my $pic = Prima::Image->new;
@@ -1281,7 +1289,7 @@ sub tryLoadDesc {
 			my $fill = 0; # filler variable
 			return unless ($sched > 1 && defined $extra);
 			$target->empty();
-			my ($error,$server,$img,$lfp) = fetchapic($ti->link,$fill,$stat);
+			my ($error,$server,$img,$lfp) = fetchapic($ti->link,\$fill,$stat);
 			return $error if $error;
 			my $viewsize = 325;
 			my $pic = Prima::Image->new;
@@ -1317,7 +1325,7 @@ sub tryLoadDesc {
 					return;
 				}
 				$target->empty();
-				my ($error,$server,$img,$lfp) = fetchapic($ti->link,$fill,$stat);
+				my ($error,$server,$img,$lfp) = fetchapic($ti->link,\$fill,$stat);
 				return $error if $error;
 				my $viewsize = 325;
 				my $pic = Prima::Image->new;
