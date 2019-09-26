@@ -36,9 +36,9 @@ install XML::RSS
 
 install DateTime
 
-install DateTime::Format::Duration;
+install DateTime::Format::Duration
 
-install DateTime::Format::DateParse;
+install DateTime::Format::DateParse
 
 install WWW::Mechanize
 
