@@ -42,4 +42,4 @@ install DateTime::Format::DateParse
 
 install WWW::Mechanize
 
-install Perl::Prima (only required for GUI program picked.pl)
+install Prima (only required for GUI program picked.pl)
