@@ -97,7 +97,7 @@ sub chooseDayImage  {
 	my $dayth = Common::ordinal($day);
 	my $lktext = "Images in category '$cat' for the $dayth of the month";
 	$box->{mybox}->insert( Label => text => $lktext);
-	my $target = $box->{mybox}->insert( HBox => name => "row", );
+	my $target = $box->{mybox}->insert( HBox => name => "row" );
 	# first, make a button for adding images to the given day
 	$box->{count} = 0;
 	#-------------------------------------Callback Start
@@ -154,16 +154,14 @@ sub chooseDayImage  {
 #devHelp($box,"Adding from the library"); return;
 		$box->{mybox}->hide();
 		my $stage = $box->insert( HBox => name => "stager", pack => { fill => 'both' }, );
-		PGK::grow($stage, boxfill => 'y', boxex => 1, margin => 7);
 		$stage->insert( Label => text => "Choosing an image to add as an option for the $dayth of the month." );
 		my $chooser = $stage->insert( VBox => name => "chooser");
-		PGK::grow($chooser, boxfill => 'y', boxex => 1, margin => 7);
 		$chooser->insert( Label => text => "Choose a file of image descriptions:");
 		# list DSC files in library
 		my $tar = [];
 		my $sched = 2;
 		my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
-		$stage->insert(Label => text => " ???", pack => { fill => 'both', expand => 1, }, );
+		$stage->insert(Label => text => " ", pack => { fill => 'both', expand => 1, }, );
 		# on click, destroy this box and list images in DSC file
 		# on click, destroy that box and add button to $target with myButton
 		# make sure this new image gets added to the regular list (calendar.txt)
@@ -181,8 +179,6 @@ sub chooseDayImage  {
 			dialog => $box,
 			trim => $tl,
 			newchoice => 1,
-			pagelen => 12,
-			nocaption => 1,
 		};
 		refreshDescList($chooser,$prev,$tar,$sched,$extra);
 	} );
@@ -482,8 +478,8 @@ sub resetScheduling {
 	my $bgcol = $$args[1];
 	my $gui = getGUI();
 	$schpage->empty(); # start with a blank slate
-	my $panes = $schpage->insert( HBox => name => 'splitter',  pack => Sui::passData('paneopts'), );
-	my $lister = $panes->insert( VBox => name => "Input", pack => Sui::passData('listopts'), backColor => PGK::convertColor($bgcol),  );
+	my $panes = $schpage->insert( HBox => name => 'splitter',  pack => { fill => 'both', expand => 0 }, );
+	my $lister = $panes->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol),  );
 	$lister->insert( Label => text => "Choose a file of image descriptions:");
 	my $tar = [];
 	my $sched = 1;
@@ -1123,30 +1119,27 @@ print ".";
 sub refreshDescList {
 	my ($resettarget,$target,$ar,$sched,$extra) = @_;
 	$resettarget->empty(); # clear the box
-	PGK::growList($resettarget, margin => 1);
 #	print ")RT: " . $resettarget->name . "...";
 	my $fb = $resettarget->insert( FilePager => name => 'descriptionFileList',);
-	PGK::growList($fb, margin => 7);
 	my $odir = (FIO::config('Disk','rotatedir') or "lib"); # pick the directory
-	my $pagelen = (FIO::config('UI','filecount') or $$extra{pagelen} or 15); # How many lines of files to display
+	my $pagelen = (FIO::config('UI','filecount') or 15); # How many lines of files to display
 #	my @files = FIO::dir2arr($odir,"dsc"); # get the list
 #	my $lister = $resettarget->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") ); # make new list box
-	$resettarget->insert( Label => text => "Choose a description file:") unless $$extra{nocaption}; # Title the new box
+	$resettarget->insert( Label => text => "Choose a description file:"); # Title the new box
 	my $stat = getGUI("status");
 	my $text = "Building buttons..";
-	$$extra{rtarget} = $resettarget;
-	$$extra{target} = $target;
-	$$extra{tar} = $ar;
-	$$extra{sched} = $sched;
-	$$extra{stat} = $stat;
-	$$extra{obj} = $fb;
-	$$extra{pagelen} = $pagelen;
-	$fb->build(control => 'buttons', mask => 'dsc', dir => $odir, action => sub { my ($f,$o) = @_; makeButton($f,$extra); }, pagelen => $pagelen,);
+	$files->build(control => 'buttons', mask => 'dsc', dir => $odir, action => \&makeButton, pagelen => $pagelen);
 	sub makeButton {
 		my ($f,$ex) = @_;
-		my ($resettarget,$target,$tar,$sched,$g) = ($$ex{rtarget},$$ex{target},$$ex{tar},$$ex{sched},$$ex{obj});
-		makeDescButton($g,$f,$resettarget,$target,$tar,$sched,$ex);
-	}
+	my ($lister,$f,$lpane,$preview,$tar,$sched,$extra) = @_;
+		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched,$extra);
+		$error && getGUI('status')->push("An error occurred loading $f!"); }, height => $buttonheight, );
+### TODO: Convert to Pager function
+#	foreach my $f (@files) {
+#			$stat->push($text);
+		makeDescButton($g,$f,$resettarget,$target,$ar,$sched,$extra);
+#			$text = "$text.";
+#	}
 	$stat->push(Common::shorten($text,50,3) . "Done. Pick a file.");
 	return 0;
 }
@@ -1161,7 +1154,6 @@ Given a reset TARGET widget, a FILE name, and a HASH in which to store data, loa
 sub tryLoadDesc {
 	my ($resettarget,$fn,$target,$ar,$sched,$extra) = @_;
 	my $orderkey = 0; # keep URLs in order
-skrDebug::keylist($extra,"\$extra");
 	my ($u1,$u2,$u3,$day) = (defined $$extra{date} ? Common::dateConv($$extra{date}) : (0,0,0,0));
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
 	$fn = "$odir/$fn";
@@ -1378,13 +1370,10 @@ print ".";
 sub makeDescButton {
 	my ($lister,$f,$lpane,$preview,$tar,$sched,$extra) = @_;
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
-print "::";
 	$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
 	#							left pane; filename; preview pane; t? array ref; schedule page?
-print ";;";
 		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched,$extra);
 		$error && getGUI('status')->push("An error occurred loading $f!"); }, height => $buttonheight, );
-print "??";
 }
 print ".";
 
