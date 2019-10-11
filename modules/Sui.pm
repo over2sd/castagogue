@@ -32,8 +32,10 @@ sub passData {
 			return getOpts();
 		} elsif (/^twidths$/) {
 			return getTableWidths();
+		} elsif (/^prereqs$/) {
+			return qw(WWW::Mechanize DateTime::Format::DateParse DateTime::Format::Duration DateTime Config::IniFiles XML::LibXML::Reader XML::RSS Unknown::Module);
 		} else {
-			return $data{$key} or undef;
+			return ($data{$key} or undef);
 		}
 	}
 }
@@ -58,7 +60,7 @@ sub expandMe {
 	$text =~ s/%date%/$dstr/;
 	$dstr = $date->strftime("%A");
 	$text =~ s/%weekday%/$dstr/;
-	my $gogue = FIO::config('Main','orgname') or "Missing Name";
+	my $gogue = (FIO::config('Main','orgname') or "Missing Name");
 	$text =~ s/%name%/$gogue/;
 # if $text =~ m/%group=/ ... run group parser ### TODO ###
 	$text=~ s/#x26;//g; # the XML output parser is going to expand the ampersand even if a valid entity follows it. *facepalm*

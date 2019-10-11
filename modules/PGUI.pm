@@ -1128,18 +1128,18 @@ sub refreshDescList {
 	$resettarget->insert( Label => text => "Choose a description file:"); # Title the new box
 	my $stat = getGUI("status");
 	my $text = "Building buttons..";
-	$files->build(control => 'buttons', mask => 'dsc', dir => $odir, action => \&makeButton, pagelen => $pagelen);
+	$fb->build(control => 'buttons', mask => 'dsc', dir => $odir, action => \&makeButton, pagelen => $pagelen);
 	sub makeButton {
-		my ($f,$ex) = @_;
-	my ($lister,$f,$lpane,$preview,$tar,$sched,$extra) = @_;
+#		my ($f,$ex) = @_;
+	my ($g,$f,$lpane,$preview,$tar,$sched,$extra) = @_;
 		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched,$extra);
-		$error && getGUI('status')->push("An error occurred loading $f!"); }, height => $buttonheight, );
+		$error && getGUI('status')->push("An error occurred loading $f!");
 ### TODO: Convert to Pager function
 #	foreach my $f (@files) {
 #			$stat->push($text);
-		makeDescButton($g,$f,$resettarget,$target,$ar,$sched,$extra);
+		makeDescButton($g,$f,$lpane,$preview,$tar,$sched,$extra);
 #			$text = "$text.";
-#	}
+	}
 	$stat->push(Common::shorten($text,50,3) . "Done. Pick a file.");
 	return 0;
 }
@@ -1493,7 +1493,7 @@ print ".";
 
 sub fetchapic { # fetches an image from the cache, or from the server if it's not there.
 	my ($line,$hitserver,$stat,$target) = @_;
-	$line =~ /(https?:\/\/)?([\w-]+\.[\w-]+\.\w+\/|[\w-]+\.\w+\/)(.*\/)*(\w+\.?\w{3})/;
+	$line =~ /(https?:\/\/)?([\w-]+\.[\w-]+\.\w+\/|[\w-]+\.\w+\/)(.*\/)*(\w+\-*\w+\.?\w{3})/;
 	my $server = ($2 or "");
 	my $img = ($4 or "");
 	$img =~ s/\?.*//; # we won't want ?download=true or whatever in our filenames.
@@ -1526,16 +1526,17 @@ sub showapic {
 	my ($lfp,$img,$viewsize) = @_;
 	my $pic = Prima::Image->new;
 	my $lfn = "$lfp$img";
-	$pic->load($lfn) or die "Could not load $lfn!";
+#	$pic->load($lfn) or die "Could not load $lfn!";
+	$pic->load($lfn) or warn "Could not load $lfn!";
 #	$pic->set(scaling => 7); # ist::Hermite);
 	my $iz = 1;
 	if ($pic->width > $pic->height) {
-		my $w = $pic->width;
-		$iz = $viewsize / $pic->width; # get appropriate scale
+		my $w = $pic->width + 1;
+		$iz = $viewsize / $w; # get appropriate scale
 		$pic->size($pic->height * $iz,$viewsize); # resize the image to fit our viewport
 	} else {
-		my $h = $pic->height;
-		my $iz = $viewsize / $pic->height; # get appropriate scale
+		my $h = $pic->height + 1;
+		my $iz = $viewsize / $h; # get appropriate scale
 		$pic->size($viewsize,$pic->width * $iz); # resize the image to fit our viewport
 	}
 	return ($pic,$iz);

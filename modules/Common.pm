@@ -4,6 +4,7 @@ print __PACKAGE__;
 use strict;
 use Exporter qw(import);
 our @EXPORT = qw( infMes getColorsbyName missing );
+use Sui qw( passData );
 
 my $debug = main::howVerbose();
 my @obj = @{ Sui::passData('objectionablecontent') };

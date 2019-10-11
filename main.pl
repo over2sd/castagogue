@@ -12,6 +12,39 @@ $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGNAME v$version is running.";
 flush STDOUT;
 
+BEGIN {
+	print "\nChecking Dependencies:";
+	my $preqs = 0;
+	my $place = 0;
+	my ($found,@ml,$mod);
+	$found = 0;
+	@ml = qw(WWW::Mechanize DateTime::Format::DateParse DateTime::Format::Duration DateTime Config::IniFiles XML::LibXML::Reader XML::RSS);
+	for $mod (@ml) {
+		if (eval "require $mod") {
+			$found++;
+		} else {
+			my $pos = 2**$place;
+			$preqs = $preqs | $pos;
+		}
+		$place++; # increase binary place
+	}
+	print "\n$found of " . scalar(@ml) . " required libraries found.\n";
+	unless ($found == scalar(@ml)) {
+		print "This program requires additional libraries to function. Please install the following modules: ";
+		while ($place >= 0) {
+			my $pos = 2**$place;
+			my $missing = (($preqs & $pos) == $pos ? 1 : 0);
+			print "$ml[$place] " if $missing;
+			$place--;
+		}
+		print "\n";
+		die "Some required modules are missing.\n";
+	}
+	unless (-d "itn" and -d "lib" and -d "schedule") {
+		die "Some functions of this program will crash without the required directories.\nPlease run 'runfirst.pl' before trying to use this program.\n";
+	}
+}
+
 use Getopt::Long;
 my $conffilename = 'config.ini';
 my $debug = 0; # verblevel
