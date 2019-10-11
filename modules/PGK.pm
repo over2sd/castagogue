@@ -1296,6 +1296,13 @@ sub Pdie {
 }
 print ".";
 
+sub Pwarn {
+	my $message = shift;
+	my $w = getGUI('mainWin');
+	saybox($w,$message);
+}
+print ".";
+
 sub Pwait {
 	my $duration = shift or 1;
 	my $start = time();

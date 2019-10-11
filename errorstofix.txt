@@ -1,0 +1,3 @@
+Illegal object reference passed to Component.get_components at /usr/local/lib/i386-linux-gnu/perl/5.24.1/Prima/Classes.pm line 214.
+After saving group and clicking create new group file, then trying to add an item to a row with the >>>> button.
+Adding page 0 / 0...DoneCan't locate object method "insert" via package "filename.dsc" (perhaps you forgot to load "filename.dsc"?) at modules/PGUI.pm line 1376.

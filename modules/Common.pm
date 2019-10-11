@@ -539,7 +539,7 @@ sub listUnsort { # Fisher-Yates shuffle
 my $limit = 0;
 	my $ar = shift;
 	my $i = @$ar; #start at end
-	while (--$i) { # moving pointer backward
+	while (--$i && $i > -1) { # moving pointer backward
 		my $j = int(rand($i+1)); # pick a random number between pointer and start
 		@$ar[$i,$j] = @$ar[$j,$i]; # swap these two
 return if ($limit++ > 200);
@@ -706,7 +706,8 @@ sub sequenceHoA {
 print ".";
 
 sub lineNo {
-	my $depth = shift;
+	my ($depth,$recursing,$input) = @_;
+	my $top = 0;
 	$depth = 1 unless defined $depth;
 	use Carp qw( croak );
 	my @loc = caller($depth);
@@ -719,10 +720,26 @@ sub lineNo {
 		$sub = $loc[$#loc];
 	} else {
 		$sub = "(MAIN)";
+		$top = 1;
 	}
-	return qq{ at line $line of $sub in $file.\n };
+	my $string = qq{ at line $line of $sub in $file.\n };
+	if ($recursing) {
+		(length($input) > 2) and ($input = substr($input,0,-3));
+		return ("$input,$string",$top);
+	}
+	return $string;
 }
 print ".";
+
+sub traceFull {
+	my ($depth,$input) = @_;
+	my $top = 0;
+	until ($top) {
+		($input,$top) = lineNo($depth,1,$input);
+		$depth++;
+	}
+	return $input;
+}
 
 sub defineAllValues {
 	my $ref = shift;

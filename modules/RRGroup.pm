@@ -28,6 +28,7 @@ sub add { # add hashes to a row.
 	my ($self,$rownum,@items) = @_;
 	my $r = $self->{rows}; # grab our list of rows
 	my $max = ($#$r < 0 ? 0 : $#$r); # find the highest available row
+#	if ($rownum < 0) { $rownum = $max; }
 	while ($max < $rownum) { # if higher than existing:
 		my $newrow = []; # add a new row, as user indicated desire for a higher row
 		push(@$r,$newrow); # push the new row into the list of rows
@@ -130,6 +131,12 @@ sub row {
 	return @{$r}; # if found, return the array of hashes.
 }
 
+sub rowloop {
+	my ($self,$rownum) = @_;
+	my $lr = $self->items($rownum) - 1;
+	return (0 .. $lr);
+}
+
 sub rowname {
 	my ($self,$rownum,$rowname) = @_;
 	return undef unless defined $rownum; # row number is not optional!
@@ -143,6 +150,9 @@ sub rowname {
 		$$rows[$rownum] = []; # make an empty row for this name
 	}
 	my $rna = $self->{names}; # get list of names
+	if ($rownum < 0) {
+		return "Invalid subscript $rownum";
+	}
 	defined $rowname and ($$rna[$rownum] = $rowname); # rename given row
 	return $$rna[$rownum]; # pass name back to caller.
 }

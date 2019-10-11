@@ -7,6 +7,10 @@ use Exporter;
 @EXPORT = qw( Dumper dump );
 
 sub dump {
-	print Dumper shift;
+	my ($ref,$desc,$showref) = @_;
+	my $desc2 = (defined $desc ? $desc : "Variable");
+	print "$desc2 is a" . (ref($ref) eq "ARRAY" ? "n ARRAY" : " " . ref($ref)) . ".\n" if $showref;
+	print "$desc: " if defined $desc;
+	print Dumper $ref;
 }
 1;
