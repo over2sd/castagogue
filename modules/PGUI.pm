@@ -381,12 +381,17 @@ sub toRSSfromGUI {
 	carpWithout($start,$process,"choose a starting date") and return;
 	carpWithout($end,$process,"choose an ending date") and return;
 # TODO: Check for valid files
+	if ($start eq "0000-00-00") { $start = "today"; }
+	if ($end eq "0000-00-00") { $end = "tomorrow"; }
 	print "Processing RSS feed out of $ifn into $ofn from $start to $end with ID of " . (defined $nextb and defined $nextb->value() ? $nextb->value() : "" ) . ".\n";
 	my $idsuggest = (defined $nextb->value() ? $nextb->value() : FIO::config('Main','nextid'));
 	FIO::config('Main','nextid',$idsuggest);
 	$victim1->destroy();
 	$victim2->destroy();
 	my $output = $target->insert( Edit => text => "", pack => { fill => 'both', expand => 1, } );
+	my $probar1 = $target->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
+	my $probar2 = $target->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
+	my $probar3 = $target->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 3);
 	Pfresh();
 	sub Prima::Edit::push {
 		my ($self,$text) = @_;
@@ -406,11 +411,18 @@ $text");
 	require castRSS;
 	Pfresh();
 	my $status = getGUI('status');
+	Sui::storeData('opo',$output);
+	Sui::storeData('progress',$probar1);
 	my $rss = castRSS::prepare($ifn,$output,1);
-	if ($start eq "0000-00-00") { $start = "today"; }
-	if ($end eq "0000-00-00") { $end = "tomorrow"; }
+	# update main progress bar
+	$probar3->max($probar1->max + $probar2->max);
+	$probar3->value($probar1->value + $probar2->value);
 	Pfresh();
+	Sui::storeData('progress',$probar2);
 	my $error = castRSS::processRange($rss,$start,$end,$output,1);
+	# update main progress bar
+	$probar3->max($probar1->max + $probar2->max);
+	$probar3->value($probar1->value + $probar2->value);
 	$output->push("Now contains " . $#{$rss->{items}} . " items...");
 #print $rss->as_string;
 	if (FIO::config('UI','preview')) {
@@ -551,10 +563,11 @@ Dies on error opening library directory.
 sub resetScheduling {
 	my ($args) = @_;
 	my $schpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	Sui::storeData('context',"Scheduling");
 	my $bgcol = $$args[1];
 	my $gui = getGUI();
 	$schpage->empty(); # start with a blank slate
-	my $panes = $schpage->insert( HBox => name => 'splitter',  pack => Sui::passData('paneopts'), expand => 0 }, );
+	my $panes = $schpage->insert( HBox => name => 'splitter',  pack => Sui::passData('paneopts'), );
 	my $lister = $panes->insert( VBox => name => "Input", pack => Sui::passData('listopts'), backColor => PGK::convertColor($bgcol),  );
 	$lister->insert( Label => text => "Choose a file of image descriptions:");
 	my $tar = [];
@@ -614,6 +627,7 @@ Dies on error opening library directory.
 sub resetPublishing {
 	my ($args) = @_;
 	my $pubpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	Sui::storeData('context',"Publishing");
 	my $bgcol = $$args[1];
 	my $gui = getGUI();
 	$pubpage->empty(); # start with a blank slate
@@ -795,7 +809,7 @@ sub itemEditor {
 	my $bhigh = 18;
 	my $extras = { height => $bhigh, };
 	my $buttons = mb::Ok;
-	my $context = Sui::passData('UI','context');
+	my $context = Sui::passData('context');
 	my $vbox = $optbox->insert( VBox => autowidth => 1, pack => { fill => 'both', expand => 1, anchor => "nw", }, alignment => ta::Left, );
 	my $nb = labelBox($vbox,"Name",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
 	my $lb = labelBox($vbox,"Link",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
@@ -1002,6 +1016,7 @@ sub resetOrdering {
 	my ($args) = @_;
 	my $sequence = [];
 	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	Sui::storeData('context',"Ordering");
 	my $bgcol = $$args[1];
 	$ordpage->empty(); # start with a blank slate
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
@@ -1073,6 +1088,7 @@ sub makeCatButtonSet {
 						$t->cat($cate->text); # all this to set this item's category to the text box's value.
 					}
 				}
+# TODO: check context
 				return $cate unless defined $extra{edit};
 				my ($eb,$ab,$prot) = ($extra{edit},$extra{adder},$extra{prot});
 				checkauto($ab,$$rows,$eb,$prot);
@@ -1097,6 +1113,7 @@ sub makeTimeButtonSet {
 						$t->time($timee->text); # all this to set this item's time to the text box's value.
 					}
 				}
+# TODO: Check context
 				return $timee unless defined $extra{edit};
 				my ($eb,$ab,$prot) = ($extra{edit},$extra{adder},$extra{prot});
 				checkauto($ab,$$rows,$eb,$prot);
@@ -1599,6 +1616,7 @@ Dies on error opening library directory.
 sub resetGrouping {
 	my ($args) = @_;
 	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	Sui::storeData('context',"Grouping");
 	my $bgcol = $$args[1];
 	$ordpage->empty(); # start with a blank slate
 	my $odir = (FIO::config('Disk','rotatedir') or "lib");
@@ -1873,6 +1891,7 @@ Dies on error opening given directory.
 sub resetDescribing {
 	my ($args) = @_;
 	my $imgpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
+	Sui::storeData('context',"Describing");
 	my $bgcol = $$args[1];
 	$imgpage->empty(); # clear page.
 	my @files = FIO::dir2arr("./","txt"); # get list of .txt files
@@ -1914,6 +1933,7 @@ sub populateMainWin {
 	my ($dbh,$gui,$refresh) = @_;
 	($refresh && (defined $$gui{pager}) && $$gui{pager}->destroy());
 	my $win = $$gui{mainWin};
+	Sui::storeData('context',"MainWin");
 	my @tabs = qw( Describing Grouping Ordering Scheduling Publishing ); # TODO: generate dynamically
 	my $pager = $win->insert( Pager => name => 'Pages', pack => { fill => 'both', expand => 1}, );
 	$pager->build(@tabs);

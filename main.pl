@@ -6,7 +6,7 @@ use utf8;
 
 # castagogue
 my $PROGNAME = "Castagogue";
-my $version = "0.016a";
+my $version = "0.017a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGNAME v$version is running.";
@@ -79,6 +79,7 @@ if ($confme) {
 	NoGUI::callOptBox($confme);
 }
 
+Sui::storeData('context','CLI');
 FIO::loadConf($conffilename);
 FIO::config('Debug','v',howVerbose());
 FIO::config('Main','nextid',$nextid);

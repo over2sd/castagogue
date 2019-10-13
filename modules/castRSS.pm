@@ -19,6 +19,7 @@ sub prepare {
 	my ($fn,$output,$isgui) = @_;
 	my $rss = XML::RSS->new;
 	$rss->parsefile($fn);
+	my $pb = Sui::passData('progress');
 	$output and $output->push("\n[I] Attempting to import $fn...");
 	my $termcolor = config('Debug','termcolors') or 0;
 	use Common qw( getColorsbyName );
@@ -29,13 +30,19 @@ sub prepare {
 	my $pccol = ($termcolor ? Common::getColorsbyName("cyan") : "");
 	my $npccol = ($termcolor ? Common::getColorsbyName("ltblue") : "");
 	$output and $output->push("Contains " . $#{$rss->{items}} . " items...");
+	$pb and $pb->max($#{$rss->{items}});
 	my $opt;
+# TODO: Replace with context check
 	if ($output and $isgui) { $opt = $output; } # if GUI, send InfMessages to GUI object.
 	my $itemno = 0;
 	my $nextid = FIO::config('Main','nextid');
 	my $purging = (FIO::config('Disk','purgeRSS') or 0); # only delete old RSS items if the user wants it done.
 	my $debug = main::howVerbose();
 	for my $i (@{$rss->{items}}) {
+		if (defined $pb) {
+			$pb->value($pb->value + 1); # increment progress bar
+			PGK::Pfresh(); # repaint
+		}
 		my $date = qq{$i->{'pubDate'}};
 		my $end = DateTime->now;
 		my $start = DateTime::Format::DateParse->parse_datetime( $date );
@@ -72,6 +79,10 @@ print "For $numinhex...";
 		}
 		$itemno++;
     }
+	if (defined $pb) {
+		$pb->value($pb->value + 1); # increment progress bar
+		PGK::Pfresh(); # repaint
+	}
 	FIO::config('Main','nextid',$nextid);
 	$|--;
 	return $rss;
@@ -145,6 +156,8 @@ print ".";
 sub processDatedFile {
 	my ($fn,$output,$opt) = @_;
 	infMes("Reading $fn..",1,$opt);
+	my $pb = Sui::passData('progress');
+	$pb and $pb->value($pb->value + 3);
 	$fn = "schedule/$fn";
 	my $v = main::howVerbose();
 	if ( $v > 2) { print " $fn"; }
@@ -441,6 +454,7 @@ sub processRange {
 # TODO: If $isgui, use popup windows instead of dying.
 	my $opt;
 	$opt = $out if $isgui;
+	my $pb = Sui::passData('progress');
 	use DateTime;
 	my $dp;
 	my $ds;
@@ -476,6 +490,9 @@ sub processRange {
 	}
 	($ds < $dp) && die "I cannot go backward in time. Sorry.\n";
 	infMes("Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":",,$opt);
+	my $length = $ds - $dp;
+	my $diff = $length->days;
+	$pb and $pb->max($diff * 2 + 2);
 	my %items = catalogRSS($r); # grab item titles to prevent duplication.
 #use Data::Dumper; print Dumper \%items;
 	my %dated = processDatedFile("dated.txt",\%items,$out,$opt);
