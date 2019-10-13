@@ -1123,11 +1123,12 @@ sub insert_to_page {
 
 	my $child = $self->{panels}->insert(@_); # create the child
 	if ($page == $self->{pagecount}) {
-		print "Adding page $page / " . $self->{pagecount} . "...";
+		print "Adding page $page.";
 		push(@{ $self->{pages} },$child); # insert child
 		push(@{ $self->{tabs} },($child->name or "unnamed$page")); # insert child's name
 		$self->{order}{($child->name or "unnamed$page")} = $page; # insert child's position
 	} else {
+		print "Filling page $page / " . $self->{pagecount} . "...";
 		$self->{pages}[$page] = $child;
 	}
 	$child->send_to_back();
@@ -1232,6 +1233,8 @@ sub build {
 	my $curr = 0;
 	my $p = $self->get_parent();
 
+	$self->{pagecount} = $pages;
+skrDebug::dump($self);
 	my $a = $self->insert_to_page(0,VBox => name => "page0", backColor => $bgcol, pack => { fill => 'both', expand => 1, } );
 	buildPageOf($p,$a,$prf{action},$self->pagelen,0,@files);
 	foreach my $c (1 .. $pages -1) {
@@ -1987,6 +1990,16 @@ print ".";
 sub grow {
 	my ($w,%args) = @_;
 	$w->pack( fill => ($args{boxfill} or 'none'), expand => (defined $args{boxex} ? $args{boxex} : 1), padx => (defined $args{marginx} ? $args{marginx} : (defined $args{margin} ? $args{margin} : 1)), pady => (defined $args{marginy} ? $args{marginy} : (defined $args{margin} ? $args{margin} : 1)), );
+}
+print ".";
+
+sub growList {
+	return grow(shift, boxfill=> 'y', boxex => 1, @_);
+}
+print ".";
+
+sub growRow {
+	return grow(shift, boxfill=> 'x', boxex => 1, @_);
 }
 print ".";
 

@@ -13,4 +13,24 @@ sub dump {
 	print "$desc: " if defined $desc;
 	print Dumper $ref;
 }
+print ".";
+
+sub keylist {
+	my ($var,$vname) = @_;
+	print "\n\tKeys of $vname:\n";
+	print join(", ",sort keys %$var);
+}
+print ".";
+
+sub PGK::showoff {
+	my ($o,$b) = @_;
+	my $bgcol = PGK::convertColor(Common::getColors(1,1,1));
+ 	$o->set( backColor => $bgcol, );
+	$bgcol = PGK::convertColor(Common::getColors(2,1,1));
+	if ($b) {
+		$o->insert( Button => text => "Here am I!", pack => {fill => "both", margin => 10, expand => 1 }, backColor => $bgcol, hint => "This is a hint");
+	}
+}
+print ".";
+
 1;

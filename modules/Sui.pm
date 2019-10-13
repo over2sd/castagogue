@@ -16,12 +16,13 @@ they're asking for.
 =cut
 
 my %data = (
-	poswt => 1.584,
-	negwt => 1.7,
 	disambiguations => {
 		tag => ["tag_(context1)","tag_(context2)"],
 		othertag => ["othertag_(context1)","othertag_(context2)"]
 	},
+	listopts => {fill => 'y', expand => 1},
+	rowopts => {fill => 'x', expand => 1},
+	paneopts => {fill => 'both', expand => 1},
 	objectionablecontent => [],
 );
 

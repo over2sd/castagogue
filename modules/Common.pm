@@ -449,6 +449,29 @@ sub errColor {
 }
 print ".";
 
+sub traceMe {
+	my ($deep,$max) = @_;
+	defined($max) or $max = 5;
+	my $me = (caller(0))[3];
+	my $caller = lineNo(1);
+	infMes("$me, called by" . $caller,{continues => 1});
+	if ($deep) {
+		my $loop = 1;
+		my $depth = 2;
+		while ($loop and ($depth < $max)) {
+			my $caller2 = lineNo($depth);
+			print "\tcalled by $caller2";
+			$loop--;
+			$depth++;
+			my $sr = (caller($depth - 1))[3];
+			unless (substr($sr,-2,2) eq "__") {
+				$loop++;
+			}
+		}
+	}
+}
+print ".";
+
 sub findClosest {
 	my ($v,@ordered) = @_;
 	if ($debug > 0) {
@@ -727,6 +750,9 @@ sub lineNo {
 		(length($input) > 2) and ($input = substr($input,0,-3));
 		return ("$input,$string",$top);
 	}
+#	my $showme = shift;
+#	$ident = ($showme ? "$ident " : "");
+#	return qq{$ident at line $line of $sub in $file.\n };
 	return $string;
 }
 print ".";
