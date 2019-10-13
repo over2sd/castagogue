@@ -8,7 +8,8 @@ A simple script for stripping the filename out of an FTP directory listing in, f
 
 =head2 USAGE
 
-	./ulistprep.pl <filename> <keep pattern> [prepend, such as base url for the directory] [outputfilename]
+	./ulistprep.pl <filename> <keep pattern> [prepend, such as base url for the directory] [outputfilename] [pagesize]
+	pagesize does nothing.
 
 =cut
 
@@ -20,6 +21,7 @@ open FILE,$fn or die "Error opening $fn\n";
 my $keeppat = shift or die("No keep pattern given!");
 my $prepend = (shift or "");
 my $out = shift;
+my $page = (shift or 15);
 if (defined $out) {
 	open OUTPUT,">>","$out" or die "ERROR opening output file $out\n";
 }

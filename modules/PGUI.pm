@@ -276,9 +276,9 @@ sub showMonthly {
 	my $monther = $picker->insert( ComboBox => style => cs::DropDownList, height => 35, growMode => gm::GrowLoX | gm::GrowLoY, items => $months, onChange => sub { $date->set(month => $_[0]->focusedItem + 1); showMonth($calhome,$date,$filarrref,$output,$catter->text); }, text => $$months[$date->month() - 1], );
 	$picker->insert( SpinEdit => name   => 'Year', min    => 1900, max => 2099, growMode => gm::GrowLoX | gm::GrowLoY, value => $date->year, onChange => sub { $date->set(year => $_[0]->value()); showMonth($calhome,$date,$filarrref,$output,$catter->text); } );
 	$picker->insert( Label => text => " at the regular time " );
-	my $first = ( keys %{ $sched{$categories[0] } } )[0];
-	my %ex = %{ $sched{$categories[0]}{"$first"} };
-skrDebug::dump(\%ex);
+	my $first = (scalar @categories ? ( keys %{ $sched{$categories[0] } } )[0] : "");
+	my %ex = (scalar @categories ? %{ $sched{$categories[0]}{"$first"} } : ());
+skrDebug::dump(\%ex,"EX",1);
 	my $timer = $picker->insert( InputLine => text => ($ex{time} or "0800" ) );
 	showMonth($calhome,$date,$filarrref,$output,$catter->text);
 	my $bbox = $pane->insert( HBox => name => "buttons" );
@@ -463,6 +463,78 @@ sub schedulePost {
 }
 print ".";
 
+sub autoShelve { # A librarian shelves; this is going in a calendar library.
+	my ($rows,$fn,$ow) = @_;
+	my @output = ();
+	unless (carpWithout($$rows,"add all in group to the library","choose a group")) { # don't allow anything to happen before group is loaded!
+		my $height = $$rows->maxr(); # how many rows in group?
+		foreach my $i (0..$height) { # traverse rows
+			my $width = $$rows->items($i); # how many columns in row?
+			foreach my $j (0..$width - 1) { # traverse columns
+				my $t = $$rows->item($i,$j); # pick each item
+				push(@output,$t->get('recur')); # all this to get this item's recurrent string to the text variable.
+			}
+		}
+	}
+	FIO::writeLines($fn,\@output,$ow);
+}
+print ".";
+
+sub showRecurLib {
+	my ($note,$bgcol,$filarrref,$odir) = @_;
+	$note->empty();
+	my $tar = [];
+	my $panes = $note->insert( HBox => name => 'splitter',  pack => { fill => 'both', expand => 1	 }, );
+	#skrDebug::showoff($panes);
+	my $lister = $panes->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol),  );
+	my $sched = 1;
+	my $prot = 0;
+	my ($selector,$rows) = (undef,RRGroup->new(order => 1));
+	my $stage = $panes->insert( VBox => name => "stager", pack => { fill => 'both' }, );
+	my $colors = FIO::config('UI','gradient');
+	my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
+	my $saver = $panes->insert( VBox => name => "Saver", pack => { fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol), );
+	my $outbox = $stage->insert( TabbedScrollNotebook => style => tns::Simple, tabs => ["Lines"], name => 'output', tabsetProfile => {colored => 0, }, pack => { fill => 'both', expand => 1, pady => 3, side => "left", }, width => 500, autoHScroll => 1, vScroll => 1, );
+	my $output = $outbox->insert( VBox => name => "output", pack => { fill => 'both', expand => 1 }, );
+	my $autobut;
+# Show a category box
+	my $cate = makeCatButtonSet($saver,\$rows,(adder => \$autobut,edit => $output,prot => $prot));
+# show autoupdate time box
+	my $timee = makeTimeButtonSet($saver,\$rows,(adder => \$autobut,edit => $output,prot => $prot));
+	my $ow = 0;
+	$saver->insert( CheckBox => text => "clear calendar", checked => $ow, onClick => sub { my $checked = $_[0]->checked; $ow = $checked;} );
+	$autobut = $saver->insert( Button => text => "Add to Library", enabled => 0, onClick => sub { autoShelve(\$rows,"$odir/calendar.txt",$ow); getGUI('status')->push($rows->rows() . " rows saved to $odir/calendar.txt\n"); } );
+
+#	$stage->insert(Label => text => " ", pack => { fill => 'both', expand => 1, }, );
+	opendir(DIR,$odir) or die $!;
+	my @files = grep {
+		/\.grp$/ # only show rotational image group files.
+		&& -f "$odir/$_"
+		} readdir(DIR);
+	closedir(DIR);
+	$lister->insert( Label => text => "Choose a group file:");
+# Show file list
+	foreach my $f (@files) {
+		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
+			$rows = tryLoadGroup($prev,$f,\$selector,$colors,undef,(time => $timee, cat => $cate, editrowname => 1, maxrows => 7));
+#skrDebug::dump($rows,"Rows",1);
+# Choose file: run test...
+			checkauto(\$autobut,$rows,$output,$prot); # 0 = two-digit date
+		});
+	}
+
+	$lister->insert( Label => text => "In Progress" );
+
+#	Display options:
+#		Can file be organized automatically into days?
+#			Allow that
+#	Show lines that could be saved
+# Save file with day format in schedule/calendar.txt
+
+	#$note->show();
+}
+print ".";
+
 
 =item resetScheduling TARGET
 
@@ -511,6 +583,7 @@ sub resetScheduling {
 	my @images = loadDatedDays($$gui{status},1);
 	my $op = $schpage->insert( Button => text => "Weekly Schedule", onClick => sub { devHelp($gui,"Setting a weekly schedule"); }, pack => { fill => 'x', expand => 0, }, );
 	my $mb = $schpage->insert( Button => text => "Monthly Schedule", onClick => sub { showMonthly($gui,$bgcol,\@images) }, pack => { fill => 'x', expand => 0, }, );
+	my $rcb = $schpage->insert( Button => text => "Recurring Item Library", onClick => sub { showRecurLib($schpage,$bgcol,\@images, (FIO::config('Disk','rotatedir') or "lib")); }, pack => { fill => 'x', expand => 0, }, );
 # This page will be for scheduling specific images with specific dates
 # buttons to load dsc files
 # a pane for dsc files to load into
@@ -718,6 +791,7 @@ sub itemEditor {
 	my $bhigh = 18;
 	my $extras = { height => $bhigh, };
 	my $buttons = mb::Ok;
+	my $context = Sui::passData('UI','context');
 	my $vbox = $optbox->insert( VBox => autowidth => 1, pack => { fill => 'both', expand => 1, anchor => "nw", }, alignment => ta::Left, );
 	my $nb = labelBox($vbox,"Name",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
 	my $lb = labelBox($vbox,"Link",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
@@ -735,14 +809,104 @@ sub itemEditor {
 	$cb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->cat($ce->text); });
 	$ub->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->time($ue->text); });
 	my $spacer = $vbox->insert( Label => text => " ", pack => { fill => 'both', expand => 1 }, );
+	if ($context eq 'library') {
+		my $rb = labelBox($vbox,"Recurrence",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+		my $re = $rb->insert( InputLine => name => 'input', text => $ri->get('recur') );
+		$rb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->set('recur',$re->text); });
+	}
 	my $fresh = Prima::MsgBox::insert_buttons( $optbox, $buttons, $extras); # not reinventing wheel
 	$fresh->set( font => applyFont('button'), );
 	$optbox->execute;
 }
 print ".";
 
+sub rownameEditor {
+	my ($b,$g,$i) = @_;
+	my $optbox = Prima::Dialog->create( centered => 1, borderStyle => bs::Sizeable, onTop => 1, width => 300, height => 100, owner => getGUI('mainWin'), text => "Edit Row Name for " . $b->text(), valignment => ta::Middle, alignment => ta::Left,);
+	my $bhigh = 18;
+	my $extras = { height => $bhigh, };
+	my $buttons = mb::Ok;
+	my $vbox = $optbox->insert( VBox => autowidth => 1, pack => { fill => 'both', expand => 1, anchor => "nw", }, alignment => ta::Left, );
+	my $nb = labelBox($vbox,"Name",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
+	my $ne = $nb->insert( InputLine => name => 'input', text => $g->rowname($i) );
+	$nb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $b->text($ne->text); $g->rowname($i,$ne->text); $optbox->close(); });
+	my $spacer = $vbox->insert( Label => text => " ", pack => { fill => 'both', expand => 1 }, );
+	my $fresh = Prima::MsgBox::insert_buttons( $optbox, $buttons, $extras); # not reinventing wheel
+	$fresh->set( font => applyFont('button'), );
+	$optbox->execute;
+}
+print ".";
+
+sub checkauto {
+	my ($autobut,$g,$lt,$parm) = @_;
+	unless (defined $g and (ref($g) eq "RRGroup") and defined $autobut and (ref($$autobut) eq "Prima::Button")) {
+		carpWithout($$autobut,"modify the button","a button");
+		carpWithout($g,"check a group","defining a group");
+		return 0;
+	}
+	$lt->{lines} = [];
+	$lt->empty();
+	$$autobut->enabled(0);
+	my @days = qw( U u M m T t W w R r F f A a Sa Sh Su sa sh su Sun Mon Tue Wed Thu Fri Sat 00 01 02 03 04 05 06 07 Sunday Monday Tuesday Wednesday Thursday Friday Saturday Shabbat ); # possible day names
+	my $datepat = qr/[0123][0-9]/; # Simplistic date validation. 00 and 32-39 are the users' responsibility.
+	my $rows = $g->rows() -1;
+	foreach my $n (0 .. $rows) {
+		$n = $g->rowname($n);
+		if ($parm == 0) {
+			#print "Seeking dates...";
+			$n =~ /($datepat)/;
+			#print "$n :> $1\n";
+			return 0 unless (defined $1);
+		} elsif ($parm == 1) {
+			#print "Seeking days...";
+			(Common::findIn($n,@days) == -1) and return 0;			
+		} else {
+			print "Unknown parm $parm...";
+			$$autobut->enabled(0);
+			return 0;
+		}
+	}
+	foreach my $n (0 .. $rows - 1) {
+		my $d = $g->rowname($n);
+		my @rowloop = $g->rowloop($n);
+		if ($parm == 0) {
+			#	Does file contain numbered rows?
+			$d =~ /($datepat)/;
+			$d = $1;
+			foreach my $i (@rowloop) {
+				my $ri = $g->item($n,$i);
+				my ($url,$title,$desc,$time,$cat);
+				$url = $ri->link;
+				$title = $ri->title;
+				$desc = $ri->text;
+				$time = $ri->time;
+				$cat = $ri->cat;
+				#	Does file contain enough info to make images?
+				next unless (defined $url and defined $title and defined $desc and defined $time and defined $cat); # skip invalid items.
+				my $line = sprintf("day=%02d>image=%s>title=%s>desc=%s>time=%04d>cat=%s>",$d,$url,$title,$desc,$time,$cat);
+				#print $line;
+				$ri->set('recur',"$line");
+				push(@{$lt->{lines}},$line);
+				$lt->insert(Label => text => $line, pack => {fill => 'x'},);
+			}
+		} elsif ($parm == 1) {
+			die "Uncoded!";
+		}
+	}
+#	print "Success!";
+	$$autobut->enabled(1);
+	return 1; # Success!
+}
+print ".";
+
 sub tryLoadGroup {
-	my ($target,$fn,$sel,$cols,$gtype,$randbut,$timefield,$catfield,$sar) = @_;
+	my ($target,$fn,$sel,$cols,$sar,%extra) = @_;
+	my $timefield = (exists $extra{time} ? $extra{time} : undef);
+	my $catfield = (exists $extra{cat} ? $extra{cat} : undef);
+	my $gtype = (exists $extra{gtype} ? $extra{gtype} : undef);
+	my $randbut = (exists $extra{rbut} ? $extra{rbut} : undef);
+	my $maxrows = (exists $extra{maxrows} ? $extra{maxrows} : undef);
+	my $bact = ($extra{editrowname} or 0);
 	my %items;
 	my $group = RRGroup->new(order => 1); # same order as order buttons on Ordering page
 	my $item;
@@ -757,6 +921,7 @@ sub tryLoadGroup {
 			main::howVerbose() and print "Row $1\n";
 			defined $item and $group->add($row,$item); # store the item if it's been defined.
 			$item = undef;
+			$group->items($row) or ($row <= 0) or $row--; # delete empty row by decrementing so it gets overwritten.
 			$row++;
 			$group->rowname($row,$1);
 		} elsif ($l =~ m/item=(.+)/) {
@@ -774,30 +939,34 @@ sub tryLoadGroup {
 	defined $item and $group->add($row,$item); # store the item if it's been defined.
 	my $rows = scalar $group->rows();
 	$target->insert( Label => text => "$rows rows loaded from $fn.", backColor => PGK::convertColor("#FFF"), );
-	$sel = $target->insert( VBox => name => "buttonbox" );
+	$$sel = $target->insert( HBox => name => "buttonbox" );
+	my $column = $$sel->insert( VBox => name => "buttoncol0" );
 	my $buttonscale = (FIO::config('UI','buts') or 15);
 	my $i = 0;
 	foreach my $i (0..$group->maxr()) {
 		my @r = $group->row($i);
 		next unless (scalar @r); # empty row deleted, skip it.
-		my $row = $sel->insert( HBox => name => "row $i", pack => { fill => 'x', }, );
-		$row->insert( Button => text => $group->rowname($i), height => $buttonscale + 2, pack => { fill => 'x', expand => 1 }, ); # Row name button
+		my $row = $column->insert( HBox => name => "row $i", pack => { fill => 'none', }, );
+		$row->insert( Button => text => $group->rowname($i), height => $buttonscale + 1, pack => { fill => 'x', expand => 0 }, onClick => ($bact ? sub { rownameEditor($row,$group,$i); $_[0]->text($group->rowname($i)); } : sub { main::howVerbose() > 3 and print $_[0]->text . " pressed!\n"; })); # Row name button
 		$row->insert( Label => text => " ");
 		foreach my $c (@r) {
 			next unless (ref $c eq "RItem"); # skip bad items
 			$c->widget($row->insert( Button => width => $buttonscale, height => $buttonscale, text => "", hint => $c->text() . " (" . $c->link() . ")", onClick => sub { itemEditor($c); }));
 			$c->widget()->set( backColor => PGK::convertColor("#FFF"), );
 		}
+		unless ($i % ($maxrows or FIO::config('UI','buttonrowmax') or 15) or $i == 0) {
+			$column = $$sel->insert( VBox => name => "buttoncol$i" );
+		}
 	}
-	$gtype->onChange( sub {
+	(defined $gtype) and $gtype->onChange( sub {
 		my $order = $group->order($gtype->value()); # change the group's order type.
 		main::howVerbose() and infMes("Order is now $order",1); # say the group's order type.
-		generateSequence($group,$sel,$sar); # show the effect immediately.
+		(defined $sar) and generateSequence($group,$sel,$sar); # show the effect immediately.
 	} );
-	$randbut->set( onClick => sub { generateSequence($group,$sel,$sar); }, ); # set button to generate a new sequence without changing order type.
+	(defined $randbut) and $randbut->set( onClick => sub { generateSequence($group,$sel,$sar); }, ); # set button to generate a new sequence without changing order type.
 	my $typical = $group->item(0,0); # just grab an item for values; the user will probably change them anyway.
-	$timefield->text($typical->time);
-	$catfield->text($typical->category);
+	(defined $timefield) and $timefield->text($typical->time);
+	(defined $catfield) and $catfield->text($typical->category);
 	return $group;
 }
 print ".";
@@ -850,7 +1019,7 @@ sub resetOrdering {
 	my $rpane = $sides->insert( VBox => name => "Output", pack => {fill => 'both', expand => 1, anchor => "nw", }, backColor => PGK::convertColor($bgcol2), );
 	foreach my $f (@files) {
 		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-			$rows = tryLoadGroup($rpane,$f,$selector,$colors,$gtype,$randbut,$timee,$cate,$sequence);
+			$rows = tryLoadGroup($rpane,$f,\$selector,$colors,$sequence,(gtype => $gtype,rbut => $randbut, time => $timee, cat => $cate,));
 		});
 	}
 	$gtype = $lpane->insert( XButtons => name => "group type"); # an XButton set to select ordering
@@ -862,34 +1031,9 @@ sub resetOrdering {
 	 $gtype->build("Group Type:",$def,@types); # show me the buttons
 	$gtype->onChange( sub { carpWithout($rows,"set order type","choose a group"); } ); # change the group's order type.
 	$randbut = $llpane->insert( Button => text => "Produce Order", onClick => sub { carpWithout($rows,"produce a sequence","choose a group") }, pack => { fill => 'x' }, ); # a randomize button to generate a new sequence.
-	my $cateb = labelBox($llpane,"Category: ",'category','V', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
-	$cate = $cateb->insert( InputLine => text => "");
-	my $catea = $cateb->insert( Button => text => "Apply to All", onClick => sub {
-			unless (carpWithout($rows,"apply a category to all in group","choose a group")) { # don't allow anything to happen before group is loaded!
-				my $height = $rows->maxr(); # how many rows in group?
-				foreach my $i (0..$height) { # traverse rows
-					my $width = $rows->items($i); # how many columns in row?
-					foreach my $j (0..$width - 1) { # traverse columns
-						my $t = $rows->item($i,$j); # pick each item
-						$t->cat($cate->text); # all this to set this item's category to the text box's value.
-					}
-				}
-			}
-		});
-	my $timeeb = labelBox($llpane,"Publish time\n(24h form HHMM): ",'time','V', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
-	$timee = $timeeb->insert( InputLine => text => "");
-	my $timeea = $timeeb->insert( Button => text => "Apply to All", onClick => sub {
-			unless (carpWithout($rows,"apply a publishing time to all in group","choose a group")) { # don't allow anything to happen before group is loaded!
-				my $height = $rows->maxr(); # how many rows in group?
-				foreach my $i (0..$height) { # traverse rows
-					my $width = $rows->items($i); # how many columns in row?
-					foreach my $j (0..$width - 1) { # traverse columns
-						my $t = $rows->item($i,$j); # pick each item
-						$t->time($timee->text); # all this to set this item's time to the text box's value.
-					}
-				}
-			}
-		});
+	$cate = makeCatButtonSet($llpane,\$rows);
+	$timee = makeTimeButtonSet($llpane,\$rows);
+
 	my $savings = $llpane->insert( HBox => name => "savers" );
 	my $saveas;
 	my $saver = $savings->insert( Button => text => "Save as...", onClick => sub { carpWithout($rows,"save a sequence","choose a group") or saveSequence($saveas->text(),$sequence); }, ); # a button to save group into a group file.
@@ -905,6 +1049,56 @@ sub resetOrdering {
 		next if ($i > 24);
 		$op2->insert( Button => text => "", width => 9, height => 9, backColor => PGK::convertColor($colora[$i % ($#colora + 1)]));
 	}
+	my $gui = getGUI();
+	my @images = loadDatedDays($$gui{status},1);
+	my $rcb = $llpane->insert( Button => text => "Recurring Item Library", onClick => sub { showRecurLib($ordpage,$bgcol,\@images,$odir); }, pack => { fill => 'x', expand => 0, }, );
+}
+print ".";
+
+sub makeCatButtonSet {
+	my ($llpane,$rows,%extra) = @_;
+	my $cateb = labelBox($llpane,"Category: ",'category','V', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+	my $cate = $cateb->insert( InputLine => text => "");
+	my $catea = $cateb->insert( Button => text => "Apply to All", onClick => sub {
+			unless (carpWithout($$rows,"apply a category to all in group","choose a group")) { # don't allow anything to happen before group is loaded!
+				my $height = $$rows->maxr(); # how many rows in group?
+				foreach my $i (0..$height) { # traverse rows
+					my $width = $$rows->items($i); # how many columns in row?
+					foreach my $j (0..$width - 1) { # traverse columns
+						my $t = $$rows->item($i,$j); # pick each item
+						$t->cat($cate->text); # all this to set this item's category to the text box's value.
+					}
+				}
+				return $cate unless defined $extra{edit};
+				my ($eb,$ab,$prot) = ($extra{edit},$extra{adder},$extra{prot});
+				checkauto($ab,$$rows,$eb,$prot);
+print join(',',@{$eb->{lines}});
+			}
+		});
+	return $cate;
+}
+print ".";
+
+sub makeTimeButtonSet {
+	my ($llpane,$rows,%extra) = @_;
+	my $timeeb = labelBox($llpane,"Publish time\n(24h form HHMM): ",'time','V', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
+	my $timee = $timeeb->insert( InputLine => text => "");
+	my $timeea = $timeeb->insert( Button => text => "Apply to All", onClick => sub {
+			unless (carpWithout($$rows,"apply a publishing time to all in group","choose a group")) { # don't allow anything to happen before group is loaded!
+				my $height = $$rows->maxr(); # how many rows in group?
+				foreach my $i (0..$height) { # traverse rows
+					my $width = $$rows->items($i); # how many columns in row?
+					foreach my $j (0..$width - 1) { # traverse columns
+						my $t = $$rows->item($i,$j); # pick each item
+						$t->time($timee->text); # all this to set this item's time to the text box's value.
+					}
+				}
+				return $timee unless defined $extra{edit};
+				my ($eb,$ab,$prot) = ($extra{edit},$extra{adder},$extra{prot});
+				checkauto($ab,$$rows,$eb,$prot);
+			}
+		});
+	return $timee;
 }
 print ".";
 
@@ -1131,7 +1325,7 @@ sub refreshDescList {
 	$fb->build(control => 'buttons', mask => 'dsc', dir => $odir, action => \&makeButton, pagelen => $pagelen);
 	sub makeButton {
 #		my ($f,$ex) = @_;
-	my ($g,$f,$lpane,$preview,$tar,$sched,$extra) = @_;
+		my ($g,$f,$lpane,$preview,$tar,$sched,$extra) = @_;
 		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched,$extra);
 		$error && getGUI('status')->push("An error occurred loading $f!");
 ### TODO: Convert to Pager function

@@ -10,6 +10,7 @@ lib/
 ulist*.txt
 notes.txt
 rssnew.xml
+local/*.*
 
 !Build/
 .last_cover_stats
