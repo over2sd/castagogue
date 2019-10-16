@@ -389,8 +389,11 @@ sub toRSSfromGUI {
 	$victim1->destroy();
 	$victim2->destroy();
 	my $output = $target->insert( Edit => text => "", pack => { fill => 'both', expand => 1, } );
+	$target->insert(Label => text => "Preparation");
 	my $probar1 = $target->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
+	$target->insert(Label => text => "Processing");
 	my $probar2 = $target->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
+	$target->insert(Label => text => "Total Progress");
 	my $probar3 = $target->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 3);
 	Pfresh();
 	sub Prima::Edit::push {
@@ -415,12 +418,14 @@ $text");
 	Sui::storeData('progress',$probar1);
 	my $rss = castRSS::prepare($ifn,$output,1);
 	# update main progress bar
+	$probar1->value($probar1->max()); # no matter what, we've left the prepare() function, so we're done with that.
 	$probar3->max($probar1->max + $probar2->max);
 	$probar3->value($probar1->value + $probar2->value);
 	Pfresh();
 	Sui::storeData('progress',$probar2);
 	my $error = castRSS::processRange($rss,$start,$end,$output,1);
 	# update main progress bar
+	$probar2->value($probar2->max()); # no matter what, we've left processRange(), so we're done with that step.
 	$probar3->max($probar1->max + $probar2->max);
 	$probar3->value($probar1->value + $probar2->value);
 	$output->push("Now contains " . $#{$rss->{items}} . " items...");

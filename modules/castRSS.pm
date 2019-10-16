@@ -157,7 +157,7 @@ sub processDatedFile {
 	my ($fn,$output,$opt) = @_;
 	infMes("Reading $fn..",1,$opt);
 	my $pb = Sui::passData('progress');
-	$pb and $pb->value($pb->value + 3);
+	$pb and $pb->value($pb->value + 1);
 	$fn = "schedule/$fn";
 	my $v = main::howVerbose();
 	if ( $v > 2) { print " $fn"; }
@@ -201,6 +201,10 @@ sub processDatedFile {
 print $ti->name;
 				$items{$ldate} = [] unless exists $items{$ldate};
 				push(@{$items{$ldate}},$ti); # store record
+				if ($pb) { # increment operations and completion
+					$pb->max($pb->max + 1);
+					$pb->value($pb->value + 1);
+				}
 			}
 			close($fh); # close file
 		}
@@ -492,8 +496,11 @@ sub processRange {
 	infMes("Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":",,$opt);
 	my $length = $ds - $dp;
 	my $diff = $length->days;
-	$pb and $pb->max($diff * 2 + 2);
+	$pb and $pb->max($diff + 2);
+	PGK::Pfresh();
 	my %items = catalogRSS($r); # grab item titles to prevent duplication.
+	$pb->value($pb->value() + 1);
+	PGK::Pfresh();
 #use Data::Dumper; print Dumper \%items;
 	my %dated = processDatedFile("dated.txt",\%items,$out,$opt);
 #print ";;;" . Dumper %dated;
@@ -501,8 +508,9 @@ sub processRange {
 		processDay($dp,$r,\%items,$out,$opt);
 		addDatedToday($r,\%items,($dated{$dp->ymd()} or []),$dp,$out,$opt); # TODO: Add items from %dated ($dated{$dp})
 #		print $dp->ymd() . " ... " . Dumper \@{$dated{$dp->ymd()}};
-		
+		$pb and $pb->value($pb->value() + 1);
 		$dp = $dp + DateTime::Duration->new( days=> 1 );
+		$pb and PGK::Pfresh();
 	}
 	return 0;
 }
