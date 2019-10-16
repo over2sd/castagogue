@@ -13,7 +13,7 @@ use skrDebug;
 ####### This is necessary because image hosting services don't usually give you access to your images in a sensible filename.
 
 my $PROGRAMNAME = "Castapic";
-my $version = "0.027a";
+my $version = "0.028a";
 
 print "[I] $PROGRAMNAME v$version is running.";
 flush STDOUT;

@@ -119,6 +119,7 @@ sub getOpts {
 
 		'020' => ['l',"File",'Disk'],
 		'021' => ['t',"Rotational Image Group files live here",'rotatedir'],
+		'023' => ['t',"Schedule files live here",'scheddir'],
 		'022' => ['c',"Keep nextID across sessions",'persistentnext'],
 		'025' => ['c',"Purge old RSS items when loading",'purgeRSS'],
 		
@@ -131,9 +132,10 @@ sub getOpts {
 		'040' => ['c',"Show a horizontal rule between rows",'rulesep'],
 		'041' => ['x',"Rule color: ",'rulecolor',"#003"],
 		'042' => ['n',"How many rows per column in file lists?",'filerows',10,3,30,1,5],
-		'043' => ['t',"Color codes for gradient (comma separated)",'gradient'],
-		'044' => ['c',"Preview RSS feed before saving",'preview'],
-		'045' => ['n',"Size of calendar buttons",'caldaysize',100,20,500,1,10],
+		'043' => ['n',"How many rows per column in image lists?",'buttonrowmax',10,3,30,1,5],
+		'044' => ['t',"Color codes for gradient (comma separated)",'gradient'],
+		'045' => ['c',"Preview RSS feed before saving",'preview'],
+		'046' => ['n',"Size of calendar buttons",'caldaysize',100,20,500,1,10],
 
 		'100' => ['l',"Network",'Net'],
 		'101' => ['c',"Save bandwidth by saving image thumbnails",'savethumbs'],

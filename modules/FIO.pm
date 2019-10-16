@@ -189,7 +189,6 @@ sub Webget {
 		$out and $out->push("$lfn could not be retrieved.");
 		return 1;
 	}
-	
 }
 print ".";
 

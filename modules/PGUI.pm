@@ -73,7 +73,8 @@ sub hashAndPic {
 
 sub chooseDayImage  {
 	my ($b,$p,$date,$cat,$ar,$bsz,$auto) = @_;
-	my ($sch,$rgh) = @$ar;
+	Sui::storeData('contextdet',"Monthly");
+	my ($sch,$rgh) = @$ar; # pull Sched and Reg from ARef
 	my ($w,$h) = (640,580);
 	my $bw = $w / 9; # button widths
 	my $tl = 16; # text length
@@ -215,7 +216,7 @@ sub showMonth {
 	my $moment = 7;
 	while ($count > 0) {
 		$count--;
-	my $name = "week $count";
+		my $name = "week $count";
 		push(@weeks,$target->insert( HBox => name => $name, width => ($butsize * 7 + 7), height => ($butsize + 2)));
 	}
 	my $pos = 0;
@@ -345,7 +346,7 @@ skrDebug::dump(\%ex,"EX",1);
 						next;
 					}
 					push(@lines,"day=" . $d . ">image=" . $fields{url} . ">title=" . $fields{title} . ">desc=" . $fields{desc} . ">time=" . $timestr . ">cat=" . $c . ">");
-print Dumper $filarrref;
+#print Dumper $filarrref;
 				}
 			}
 		}
@@ -485,7 +486,7 @@ sub schedulePost {
 print ".";
 
 sub autoShelve { # A librarian shelves; this is going in a calendar library.
-	my ($rows,$fn,$ow) = @_;
+	my ($rows,$fn,$ow,$oo) = @_;
 	my @output = ();
 	unless (carpWithout($$rows,"add all in group to the library","choose a group")) { # don't allow anything to happen before group is loaded!
 		my $height = $$rows->maxr(); # how many rows in group?
@@ -498,6 +499,8 @@ sub autoShelve { # A librarian shelves; this is going in a calendar library.
 		}
 	}
 	FIO::writeLines($fn,\@output,$ow);
+	$oo->insert( Label => text => "Lines written." );
+	$oo->insert( Button => text => "Continue to Scheduling page", onClick => sub { getGUI('pager')->switchToPanel("Scheduling"); } );
 }
 print ".";
 
@@ -513,6 +516,7 @@ sub showRecurLib {
 	my ($selector,$rows) = (undef,RRGroup->new(order => 1));
 	my $stage = $panes->insert( VBox => name => "stager", pack => { fill => 'both' }, );
 	my $colors = FIO::config('UI','gradient');
+	my $sdir = (FIO::config('Disk','scheddir') or 'schedule');
 	my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
 	my $saver = $panes->insert( VBox => name => "Saver", pack => { fill => 'y', expand => 0}, backColor => PGK::convertColor($bgcol), );
 	my $outbox = $stage->insert( TabbedScrollNotebook => style => tns::Simple, tabs => ["Lines"], name => 'output', tabsetProfile => {colored => 0, }, pack => { fill => 'both', expand => 1, pady => 3, side => "left", }, width => 500, autoHScroll => 1, vScroll => 1, );
@@ -524,7 +528,7 @@ sub showRecurLib {
 	my $timee = makeTimeButtonSet($saver,\$rows,(adder => \$autobut,edit => $output,prot => $prot));
 	my $ow = 0;
 	$saver->insert( CheckBox => text => "clear calendar", checked => $ow, onClick => sub { my $checked = $_[0]->checked; $ow = $checked;} );
-	$autobut = $saver->insert( Button => text => "Add to Library", enabled => 0, onClick => sub { autoShelve(\$rows,"$odir/calendar.txt",$ow); getGUI('status')->push($rows->rows() . " rows saved to $odir/calendar.txt\n"); } );
+	$autobut = $saver->insert( Button => text => "Add to Library", enabled => 0, onClick => sub { autoShelve(\$rows,"$sdir/calendar.txt",$ow,$stage); getGUI('status')->push($rows->rows() . " rows saved to $sdir/calendar.txt\n"); } );
 
 #	$stage->insert(Label => text => " ", pack => { fill => 'both', expand => 1, }, );
 	opendir(DIR,$odir) or die $!;
@@ -889,7 +893,7 @@ sub checkauto {
 			return 0;
 		}
 	}
-	foreach my $n (0 .. $rows - 1) {
+	foreach my $n (0 .. $rows) {
 		my $d = $g->rowname($n);
 		my @rowloop = $g->rowloop($n);
 		if ($parm == 0) {
@@ -1097,7 +1101,7 @@ sub makeCatButtonSet {
 				return $cate unless defined $extra{edit};
 				my ($eb,$ab,$prot) = ($extra{edit},$extra{adder},$extra{prot});
 				checkauto($ab,$$rows,$eb,$prot);
-print join(',',@{$eb->{lines}});
+#print join(',',@{$eb->{lines}});
 			}
 		});
 	return $cate;
@@ -1361,10 +1365,10 @@ sub refreshDescList {
 	sub makeButton {
 		my ($f,$ex) = @_;
 		my ($resettarget,$target,$tar,$sched,$g) = ($$ex{rtarget},$$ex{target},$$ex{tar},$$ex{sched},$$ex{obj});
-		makeDescButton($g,$f,$resettarget,$target,$tar,$sched,$ex);
+		makeDescButton($g,$f,$resettarget,$target,$tar,$ex);
 #		my ($f,$ex) = @_;
 #		my ($g,$f,$lpane,$preview,$tar,$sched,$extra) = @_;
-#		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched,$extra);
+#		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$extra);
 #		$error && getGUI('status')->push("An error occurred loading $f!");
 ### TODO: Convert to Pager function
 #	foreach my $f (@files) {
@@ -1384,7 +1388,7 @@ Given a reset TARGET widget, a FILE name, and a HASH in which to store data, loa
 =cut
 
 sub tryLoadDesc {
-	my ($resettarget,$fn,$target,$ar,$sched,$extra) = @_;
+	my ($resettarget,$fn,$target,$ar,$extra) = @_;
 	my $orderkey = 0; # keep URLs in order
 skrDebug::keylist($extra,"\$extra");
 	my ($u1,$u2,$u3,$day) = (defined $$extra{date} ? Common::dateConv($$extra{date}) : (0,0,0,0));
@@ -1404,6 +1408,7 @@ skrDebug::keylist($extra,"\$extra");
 ### TODO: Convert to Pager function
 #sub processDesc {
 #	my ($ar,$resettarget,$sched,$extra,$target,$stat,@them) = @_;
+	my $sched = ("Scheduling" eq Sui::passData('context'));
 	my $count = 0;
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$stat->push("Processing " . scalar @them . " lines...");
@@ -1457,7 +1462,7 @@ skrDebug::keylist($extra,"\$extra");
 					my $pr;
 					if ($sched) { # on the schedule page
 						my $fill = 0; # filler variable
-						if ($sched == 2 && defined $extra) {
+						if (("Monthly" eq Sui::passData('contextdet')) && defined $extra) {
 							my $description = $pi->text();
 							$description =~ s/\s+^//; # trim trailing whitespace
 							$$extra{cbsub}->($$extra{dialog},$$extra{target},$$extra{button},$$extra{ar},$pi->link,$pi->title,$description,$$extra{category},$$extra{date},$$extra{trim},$$extra{newchoice});
@@ -1605,7 +1610,7 @@ sub makeDescButton {
 	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
 	$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
 	#							left pane; filename; preview pane; t? array ref; schedule page?
-		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$sched,$extra);
+		my $error = tryLoadDesc($lpane,$f,$preview,$tar,$extra);
 		$error && getGUI('status')->push("An error occurred loading $f!"); }, height => $buttonheight, );
 }
 print ".";
@@ -1745,7 +1750,7 @@ sub fetchapic { # fetches an image from the cache, or from the server if it's no
 		$$hitserver = 1;
 		$stat->push("Trying to fetch $line ($img)");
 		Pfresh();
-		print("Trying to fetch $line ($img) to $lfp");
+		print("Trying to fetch $line ($img) to $lfp\n");
 		my $failure = FIO::Webget($line,"$lfp$img");# get image from server here
 		$failure and defined $target and $target->insert( Label => name => "$img", text => "$img could not be retrieved from server $2.");
 	} else {
@@ -1761,7 +1766,7 @@ sub showapic {
 	my $pic = Prima::Image->new;
 	my $lfn = "$lfp$img";
 #	$pic->load($lfn) or die "Could not load $lfn!";
-	$pic->load($lfn) or warn "Could not load $lfn!";
+	(-e $lfn && -f _ && -r _) and $pic->load($lfn) or warn "Could not load $lfn!";
 #	$pic->set(scaling => 7); # ist::Hermite);
 	my $iz = 1;
 	if ($pic->width > $pic->height) {
@@ -1828,33 +1833,68 @@ sub tryLoadInput {
 			$stat->push("One line found in file!");
 		}
 	}
-	my $outbox = labelBox($resettarget,"Images",'imagebox','V', boxfill => 'both', boxex => 0, labfill => 'none', labex => 0);
-	my $hb = $outbox->insert( HBox => name => "$fn", pack => {fill => 'x', expand => 1} ); # Left/right panes
-	my $ib = $hb->insert( VBox => name => "Image Port", pack => {fill => 'y', expand => 1, padx => 3, pady => 3,}, width => $viewsize + 10 ); # Top/bottom pane in left pane
-	my $vp; # = $ib->insert( ImageViewer => name => "i$img", zoom => $iz, pack => {fill => 'none', expand => 1, padx => 1, pady => 1,} ); # Image display box
-	my $cap = $ib->insert( Label => text => "(Nothing Showing)\nTo load an image, click its button in the list.", autoHeight => 1, pack => {fill => 'x', expand => 0, padx => 1, pady => 1,} ); # caption label
-	my $lbox = $hb->insert( VBox => name => "Images", pack => {fill => 'both', expand => 1, padx => 0, pady => 0, minHeight => $viewsize + 75, } ); # box for image rows
-	my $groupsof = 10;
+	my $parms = [$stat,\$hitserver,$hashr,\$orderkey,$buttonheight,$collapsed,$expanded,$moment];
+	sub outboxMaker {
+		my ($rt,$filen,$vs,$list,$args) = @_;
+		my ($sb,$hitsr,$hr,$okeyr,$buthi,$coll,$exp,$mom) = @{$args};
+		$hr = {};
+		my $moreitems = 0;
+		my @them = @{$list};
+		my $outbox = labelBox($rt,"Images",'imagebox','V', boxfill => 'both', boxex => 0, labfill => 'none', labex => 0);
+		my $hb = $outbox->insert( HBox => name => "$filen", pack => {fill => 'x', expand => 1} ); # Left/right panes
+		my $ib = $hb->insert( VBox => name => "Image Port", pack => {fill => 'y', expand => 1, padx => 3, pady => 3,}, width => $vs + 10 ); # Top/bottom pane in left pane
+		my $vp; # = $ib->insert( ImageViewer => name => "i$img", zoom => $iz, pack => {fill => 'none', expand => 1, padx => 1, pady => 1,} ); # Image display box
+		my $cap = $ib->insert( Label => text => "(Nothing Showing)\nTo load an image, click its button in the list.", autoHeight => 1, pack => {fill => 'x', expand => 0, padx => 1, pady => 1,} ); # caption label
+		my $lbox = $hb->insert( VBox => name => "Images", pack => {fill => 'both', expand => 1, padx => 0, pady => 0, minHeight => $vs + 75, } ); # box for image rows
+		my $groupsof = (FIO::config('UI','buttonrowmax') or 10);
 #	my ($pager,@book) = pagifyGroup($lbox,scalar @them,$groupsof,$viewsize,"VBox");
-	my $page = $lbox;
-	if (scalar @them > $groupsof) {
+		my $page = $lbox;
+		if (scalar @them > $groupsof) {
+			$moreitems = int((scalar @them) / $groupsof);
+print "More: $moreitems (${groupsof}::" . scalar @them . ")\n";
 #		$page = $book[0];
-	}
-	my $pagenumber = 0;
-	my $pageitem = 0;
-	unless ($fn eq "NONE") { # real file...
-		foreach my $line (@them) {
-			placeDescLine($page,$stat,\$hitserver,$line,$hashr,\$orderkey,$viewsize,$buttonheight,\$vp,$cap,$ib,$collapsed,$expanded,$moment,\$pageitem,\$pagenumber);
+		} else {
+			$groupsof = scalar @them; # make groups of total size if smaller, for use in loops.
 		}
-	} else { # manual entry
-		$outbox->insert( Button => text => "Add an image", onClick => sub {
-			my %ans = PGK::askbox($outbox,"Enter Image Details",{},"url","URL:","title","Title:","desc","Description:");
-			return -1 unless (exists $ans{url} and $ans{url} ne '');
-			placeDescLine($page,$stat,\$hitserver,$ans{url},$hashr,\$orderkey,$viewsize,$buttonheight,\$vp,$cap,$ib,$collapsed,$expanded,$moment,\$pageitem,\$pagenumber,$ans{desc},$ans{title});
-		} );
+		my $pagenumber = 0;
+		my $pageitem = 0;
+		unless ($filen eq "NONE") { # real file...
+			foreach my $ln (0 .. $groupsof) {
+				my $line = shift @them;
+				placeDescLine($page,$sb,$hitsr,$line,$hr,$okeyr,$vs,$buthi,\$vp,$cap,$ib,$coll,$exp,$mom,\$pageitem,\$pagenumber);
+			}
+		} else { # manual entry
+			$outbox->insert( Button => text => "Add an image", onClick => sub {
+				my %ans = PGK::askbox($outbox,"Enter Image Details",{},"url","URL:","title","Title:","desc","Description:");
+				return -1 unless (exists $ans{url} and $ans{url} ne '');
+				placeDescLine($page,$sb,$hitsr,$ans{url},$hr,$okeyr,$vs,$buthi,\$vp,$cap,$ib,$coll,$exp,$mom,\$pageitem,\$pagenumber,$ans{desc},$ans{title});
+			} );
+		}
+		$moreitems and $outbox->insert( Button => text => "Skip this $groupsof items", pack => { fille => 'x', expand => 0, }, onClick => sub {
+			$outbox->destroy();
+			$sb->push("Skipping this screen of items.");
+			outboxMaker($rt,$filen,$vs,\@them,$args);
+		}, );
+		my $of = $outbox->insert( InputLine => text => ($filen eq "NONE" ? "manual.dsc" : "prayers.dsc"), pack => { fill => 'x', expand => 0, },);
+		$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 0, }, onClick => sub {
+			my $ofn = $of->text;
+			$ofn =~ s/\..+$//;
+			$ofn = "$ofn.dsc";
+			$outbox->destroy();
+			saveDescs($ofn,$hr,0);
+			$sb->push("Descriptions written to $ofn.");
+			my $cont = $rt->insert( VBox => name => "continuations", pack => {fill => 'both', expand => 1} );
+			$cont->insert( Label => text => "Your file has been saved.", pack => {fill => 'both', expand => 1});
+			if ($moreitems) {
+				$cont->insert( Label => text => "More items were found in this file." );
+				$cont->insert( Button => text => "Load page next $groupsof lines", onClick => sub { $cont->destroy(); outboxMaker($rt,$filen,$vs,\@them,$args); }, );
+			}
+			$cont->insert( Button => text => "Continue to Grouping tab", onClick => sub { getGUI('pager')->switchToPanel("Grouping"); } );
+			$cont->insert( Button => text => "Continue to Scheduling tab", onClick => sub { getGUI('pager')->switchToPanel("Scheduling");} );
+			$cont->insert( Label => text => scalar %$hr . " images.", pack => {fill => 'both', expand => 1});
+		});
 	}
-	my $of = $outbox->insert( InputLine => text => ($fn eq "NONE" ? "manual.dsc" : "prayers.dsc"), pack => { fill => 'x', expand => 0, },);
-	$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 0, }, onClick => sub { my $ofn = $of->text; $ofn =~ s/\..+$//; $ofn = "$ofn.dsc"; $outbox->destroy(); saveDescs($ofn,$hashr,0); $stat->push("Descriptions written to $ofn."); $resettarget->insert( Label => text => "Your file has been saved.", pack => {fill => 'both', expand => 1}); $resettarget->insert( Button => text => "Continue to Grouping tab", onClick => sub { getGUI('pager')->switchToPanel("Grouping"); } ); $resettarget->insert( Button => text => "Continue to Scheduling tab", onClick => sub { getGUI('pager')->switchToPanel("Scheduling"); } ); $resettarget->insert( Label => text => scalar %$hashr . " images.", pack => {fill => 'both', expand => 1}); });
+	outboxMaker($resettarget,$fn,$viewsize,\@them,$parms);
 	$stat->push("Done.");
 	return 0; # success!
 }

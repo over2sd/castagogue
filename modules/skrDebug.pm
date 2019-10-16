@@ -2,6 +2,13 @@ package skrDebug;
 
 $|++; # immediate STDOUT, one would hope.
 use Data::Dumper; # used by debug statements that unpack references.
+#$Data::Dumper::Terse = 1;
+$Data::Dumper::Indent = 1;
+#$Data::Dumper::Useqq = 1;
+#$Data::Dumper::Deparse = 1;
+#$Data::Dumper::Quotekeys = 0;
+$Data::Dumper::Sortkeys = 1;
+
 use Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw( Dumper dump );

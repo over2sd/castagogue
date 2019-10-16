@@ -30,3 +30,5 @@ Code review window for Publishing page.
 Use events.txt, a dated file, to generate additional lines for event posts, which should be marked with insert=events and have timeHHMM= markers on their lines.
 Have a calendar that, when a date is clicked, opens a dialog showing all events for that day (from events.txt) and allowing the user to add an event by entering a time and text.
 After publishing, give an Exit button in addition to a Continue button.
+Make a function that grabs the object's parent, finds out its bgcolor, and matches it.
+On Grouping tab, change layout so that items can be placed in a group file and row without showing the rows, which can get ungainly.
