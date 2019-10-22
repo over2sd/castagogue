@@ -81,12 +81,14 @@ sub chooseDayImage  {
 	my $n = 0;
 	my ($x,$y,$m,$day) = Common::dateConv($date);
 	if ($auto) { # skip UI elements
-		print "Choosing automatically for $y-$m-$day...";
+		print "Choosing automatically for $y-$m-$day:$cat...";
+		return unless defined $$rgh{$cat}{$day}; 
 		my $array_length = scalar @{ $$rgh{$cat}{$day} };
 		return 0 unless $array_length > 0;
 		my $rpc = int(rand(512)) % $array_length;
-		my ($u,$t,$d) = ($$rgh{$cat}{day}[$rpc]{url},$$rgh{$cat}{day}[$rpc]{title},$$rgh{$cat}{day}[$rpc]{desc});
+		my ($u,$t,$d) = ($$rgh{$cat}{$day}[$rpc]{url},$$rgh{$cat}{$day}[$rpc]{title},$$rgh{$cat}{$day}[$rpc]{desc});
 		print "$u.\n";
+skrDebug::dump($$rgh{$cat}{$day},"Day of $cat $rpc",1);
 		$$sch{$cat} = {} unless exists $$sch{$cat};
 		$$sch{$cat}{"$y-$m-$day"} = {} unless exists $$sch{$cat}{"$y-$m-$day"};
 		my $s = $$sch{$cat}{"$y-$m-$day"};
@@ -201,7 +203,7 @@ print ".";
 
 sub showMonth {
 	my @days_in_months = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
-	my ($target,$date,$far,$out,$cat) = @_;
+	my ($target,$date,$far,$out,$cat,%args) = @_;
 	$target->empty();
 	$out->{days} = []; # clear storage for refresh
 	my $stat = getGUI('status');
@@ -240,6 +242,8 @@ sub showMonth {
 			my $tit = $$hr{title};
 			my $des = $$hr{desc};
 			my $error = PGK::buttonPic($a,$url,\$hitserver,$out);
+		} elsif (exists $args{auto} and $args{auto} == 1) {
+#			chooseDayImage($a,$weeks[$w],"$y-$m-$d",$cat,$far,$butsize,1);
 		} else {
 			# load placeholder image
 		}
@@ -371,6 +375,7 @@ sub saveItAsIs {
 
 sub toRSSfromGUI {
 	my ($target,$inf,$outf,$dfrom,$dto,$nextb,$victim1,$victim2,$bgcol) = @_;
+	my $bg = Sui::passData('background');
 	my $process = "process an RSS feed";
 	my $ifn = $inf->text();
 	my $ofn = $outf->text();
@@ -390,12 +395,13 @@ sub toRSSfromGUI {
 	$victim1->destroy();
 	$victim2->destroy();
 	my $output = $target->insert( Edit => text => "", pack => { fill => 'both', expand => 1, } );
-	$target->insert(Label => text => "Preparation");
-	my $probar1 = $target->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
-	$target->insert(Label => text => "Processing");
-	my $probar2 = $target->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
-	$target->insert(Label => text => "Total Progress");
-	my $probar3 = $target->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 3);
+	my $pbbox = $target->insert( VBox => backColor => $bg, pack => Sui::passData('rowopts'), );
+	$pbbox->insert(Label => text => "Preparation");
+	my $probar1 = $pbbox->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
+	$pbbox->insert(Label => text => "Processing");
+	my $probar2 = $pbbox->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
+	$pbbox->insert(Label => text => "Total Progress");
+	my $probar3 = $pbbox->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 3);
 	Pfresh();
 	sub Prima::Edit::push {
 		my ($self,$text) = @_;
@@ -418,6 +424,7 @@ $text");
 	Sui::storeData('opo',$output);
 	Sui::storeData('progress',$probar1);
 	my $rss = castRSS::prepare($ifn,$output,1);
+	my @existing = @{$rss->{items}}; # copy existing
 	# update main progress bar
 	$probar1->value($probar1->max()); # no matter what, we've left the prepare() function, so we're done with that.
 	$probar3->max($probar1->max + $probar2->max);
@@ -436,16 +443,28 @@ $text");
 		Pfresh();
 		my $review = $target->insert( VBox => name => 'review', pack => { fill => 'both', expand => 1 });# VBox to hold RItems
 		$review->insert( Label => text => "Reviewing RSS feed is not yet coded. Sorry." );
-# each existing RSS item will be loaded, given a different background color than generated items.
-# each RItem row should have a button to remove that item.
-# each RItem should have buttons to edit values.
-# svae button to write items to RSS
+		$rss = previewRSS($rss,$review,$pbbox,$output,@existing); # each existing RSS item will be loaded, given a different background color than generated items.
+		# save button to write items to RSS
 		$target->insert( Button => text => "Save", onClick => sub { $_[0]->destroy(); saveItAsIs($rss,$ofn,$output,$target,$bgcol); } );
 		Pfresh();
 	} else {
 		Pfresh();
 		saveItAsIs($rss,$ofn,$output,$target,$bgcol);
 	}
+}
+print ".";
+
+sub previewRSS {
+	my ($rss,$to,$gb,$out,@existing) = @_;
+	my $bg = Sui::passData('background');
+	my $bg2 = 0;
+skrDebug::dump(\@existing,"Existing");
+	# each existing RSS item will be loaded, given a different background color than generated items.
+	# each RItem row should have a button to remove that item.
+	# each RItem should have buttons to edit values.
+	Pfresh();
+	$gb->destroy(); # kill the gauge box
+	return $rss;
 }
 print ".";
 
@@ -638,6 +657,7 @@ sub resetPublishing {
 	my $pubpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
 	Sui::storeData('context',"Publishing");
 	my $bgcol = $$args[1];
+	Sui::storeData('background',PGK::convertColor($bgcol));
 	my $gui = getGUI();
 	$pubpage->empty(); # start with a blank slate
 	my $box = $pubpage->insert( VBox => name => "pubpage", backColor =>  PGK::convertColor($bgcol) + 32 );

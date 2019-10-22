@@ -144,7 +144,7 @@ sub getColorsbyName {
 	my $ccode = -1;
 	++$ccode until $ccode > $#colnames or $colnames[$ccode] eq $name;
 	$ccode = ($ccode > $#colnames) ? 0 : $ccode;
-	return getColors($ccode);
+	return getColors($ccode,@_);
 }
 print ".";
 

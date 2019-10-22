@@ -175,13 +175,16 @@ sub processDatedFile {
 		my $fh;
 		unless (open($fh,"<$fn")) { # open file
 			$output and $output->push("\n[E] Error opening file: $!" );
-			FIO:config('Main','fatalerr') && die "I am slain by unopenable file $fn because $!";
+			my $reason = "I am slain by unopenable file $fn because $!";
+			(FIO::config('Main','fatalerr') ? die $reason : warn $reason);
+			return; # in case I didn't die.
 		} else {
 			my $lead = DateTime::Duration->new( days=> (FIO::config('Main','eventlead') or 0)); # so we can add to it without losing our place.
 			while (my $line = <$fh>) { # read lines
 				chomp $line;
 				my ($ldate,$limg,$ltitle,$ldesc,$ltime,$lcat);
 				$ldate = $1 if $line =~ /date=(\d{4}-\d{2}-\d{2})>/;
+# TODO: validity checking
 				my $d = DateTime::Format::DateParse->parse_datetime( $ldate );
 				my $rdate = substr(timeAsRSS($d),0,-15);
 				my $ti = RItem->new(date => "$rdate");
@@ -236,7 +239,7 @@ sub countWeeks {
 				}
 			}
 		}
-	} else {
+	} else { # day >= 32
 		return -1;
 	}
 	return $val;
@@ -367,7 +370,7 @@ sub processFile {
 =item addDatedToday()
 	Given an RSS object ($r), a hashref of existing titles ($hr), and an arrayref of items to add ($ar), calls the processor for each item.
 	Optionally, add an output object where status messages should go ($out).
-	returns the RSS object? or any error codes? Haven't decided.
+	returns the RSS object? or any error codes? Haven't decided. Returns 0 for now.
 =cut
 sub addDatedToday {
 	my ($r,$hr,$ar,$d,$out,$opt) = @_;
@@ -403,20 +406,35 @@ sub processDay {
 	} else {
 		print "|";
 	}
-	$opt and $opt->push("Checking " . $d->ymd() . ": ");
+	my $statxt = "Checking " . $d->ymd() . ": ";
+	$opt and $opt->push($statxt);
+	my $pb = Sui::passData('progress');
+	my $sb = Sui::passData('status');
 	my @items;
 	my %timedentry;
 	my $fn = lc($d->day_name()) . ".txt"; # check day.txt
+	$pb and $pb->value($pb->value() + 1);
+	$sb and $sb->push($statxt . "weekly");
 	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
 	$fn = substr($fn,0,-4) . $d->week_of_month() . ".txt"; # check day#.txt
+	$pb and $pb->value($pb->value() + 1);
+	$sb and $sb->push($statxt . "numweekly");
 	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
 	$fn = substr($fn,0,-5) . ($d->week_of_month() % 2 ? "odd" : "even") . ".txt"; # check dayeven/dayodd.txt
+	$pb and $pb->value($pb->value() + 1);
+	$sb and $sb->push($statxt . "odd/even");
 	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
 	$fn = $d->strftime("date%d.txt"); # check date0#.txt (same date each month events)
+	$pb and $pb->value($pb->value() + 1);
+	$sb and $sb->push($statxt . "monthly");
 	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
 	$fn = $d->ymd() . ".txt"; # check YYYY-MM-DD.txt (events generated for this date specifically)
+	$pb and $pb->value($pb->value() + 1);
+	$sb and $sb->push($statxt . "dated");
 	push(@items,processFile($fn,$d,$hr,$out,$opt,\%timedentry));
-	# check for today.txt
+	$fn = "today.txt"; # check for today.txt
+#	$opt and $opt->push($statxt . "daily");
+	$pb and $pb->value($pb->value() + 1);
 	# process daily if present
 	foreach my $i (@items) { # after pulling events, put them in RSS objects
 		(ref($i) eq "RItem") || next;
@@ -459,6 +477,7 @@ sub processRange {
 	my $opt;
 	$opt = $out if $isgui;
 	my $pb = Sui::passData('progress');
+	$pb->value($pb->value() + 1);
 	use DateTime;
 	my $dp;
 	my $ds;
@@ -496,7 +515,7 @@ sub processRange {
 	infMes("Processing files from " . $dp->ymd() . " to " . $ds->ymd() . ":",,$opt);
 	my $length = $ds - $dp;
 	my $diff = $length->days;
-	$pb and $pb->max($diff + 2);
+	$pb and $pb->max(($diff * 6) + 2);
 	PGK::Pfresh();
 	my %items = catalogRSS($r); # grab item titles to prevent duplication.
 	$pb->value($pb->value() + 1);
@@ -515,7 +534,6 @@ sub processRange {
 	return 0;
 }
 print ".";
-
 
 print " OK; ";
 1;
