@@ -13,13 +13,58 @@ use Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw( Dumper dump );
 
+sub getBit { # returns bool
+	my ($pos,$mask) = @_;
+	$pos = 2**$pos;
+	return ($mask & $pos) == $pos ? 1 : 0;
+}
+print ".";
+
+sub outline {
+	my ($ref,$indent,$width) = @_;
+	my $newindent = $indent;
+	$width-- if $width; # decrease by one for looping, unless it's zero.
+	foreach my $x (0 .. $width) { $newindent = "$newindent "; }
+	if (ref($ref) eq "ARRAY") { # array
+		my $max = $#{ $ref };
+		foreach $i (0 .. $max) {
+			printf("\n%s#%3i:",$indent,$i);
+			my $rk = ref($$ref[$i]);
+			if ($rk eq "SCALAR" or $rk eq "" or $rk eq "NONE") {
+				print " $$ref[$i]";
+			} else {
+				outline($$ref[$i],$newindent,$width);
+			}
+		}
+	} elsif (ref($ref) eq "SCALAR") {
+		print " SCALAR REF: $$ref";
+	} elsif (ref($ref) eq "" or ref($ref) eq "NONE") {
+		print " SCALAR: $ref";
+	} else { # assume it's a hash or a blessed hash
+		my @list = sort keys %{ $ref };
+		foreach $k (@list) {
+			print "\n${indent}= $k:";
+			my $rk = ref($$ref{$k});
+			if ($rk eq "SCALAR" or $rk eq "" or $rk eq "NONE") {
+				print " $$ref{$k}";
+			} else {
+				print ref($$ref{$k}); # print next level's reference type
+				outline($$ref{$k},$newindent,$width);
+			}
+		}
+	}
+}
+
 sub dump {
-	my ($ref,$desc,$showref) = @_;
+	my ($ref,$desc,$showref,$args) = @_;
 	my $desc2 = (defined $desc ? $desc : "Variable");
-	print "$desc2 is a" . (ref($ref) eq "ARRAY" ? "n ARRAY" : " " . ref($ref)) . ".\n" if $showref;
-	return if $showreff == 2;
-	print "$desc: " if defined $desc;
-	print Dumper $ref;
+	print "$desc2 is a" . (ref($ref) eq "ARRAY" ? "n ARRAY" : " " . ref($ref)) . ".\n" if getBit(1,$showref);
+	print "$desc: " if ((defined $desc) and (getBit(0,$showref) or getBit(2,$showref)));
+	my $indent = ($$args{indent} or 2);
+	if (getBit(2,$showref)) {
+		return outline($ref,"",$indent);
+	}
+	print Dumper $ref if getBit(0,$showref);
 }
 print ".";
 

@@ -5,7 +5,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw( );
 
-use FIO qw( config );
+use FIO qw( config isReal );
 use PGK qw( labelBox getGUI sayBox Pdie Pwait Pager Pfresh applyFont VBox HBox labeledRow );
 use Prima qw( ImageViewer Sliders Calendar );
 use Common qw( missing infMes );
@@ -62,9 +62,9 @@ sub buildPageOf { # start of button populator. I need to have a generic version 
 sub hashAndPic {
 	my ($us,$ts,$ds,$cs,$sh,$rh,$date,$tarobj,$parobj) = @_;
 	# also, store values in scheduled hash
-	my ($x1,$x2,$x3,$day) = Common::dateConv($date);
+#	my ($x1,$x2,$x3,$day) = Common::dateConv($date);
 	$$sh{url} = $us; $$sh{title} = $ts; $$sh{desc} = $ds;
-	$parobj->close();
+	$parobj and $parobj->close();
 	my $x = 0;
 	return PGK::buttonPic($tarobj,$us,\$x);
 }
@@ -92,7 +92,7 @@ skrDebug::dump($$rgh{$cat}{$day},"Day of $cat $rpc",1);
 		$$sch{$cat} = {} unless exists $$sch{$cat};
 		$$sch{$cat}{"$y-$m-$day"} = {} unless exists $$sch{$cat}{"$y-$m-$day"};
 		my $s = $$sch{$cat}{"$y-$m-$day"};
-		return hashAndPic($u,$t,$d,$cat,$s,$rgh,$day,$b,$p); # choose the image selected
+		hashAndPic($u,$t,$d,$cat,$s,$rgh,$day,$b,$p); # choose the image selected
 	}
 	# make a dialog box
 	my $box = PGK::quickBox($p,"Choose an image",$w,$h);
@@ -232,16 +232,22 @@ sub showMonth {
 	my ($x1,$y,$m,$x2) = Common::dateConv($date); # DateTime => (datetime,scalar,scalar,scalar)
 	foreach my $d (1 .. $days_in_months[$date->month - 1]) {
 		my $row = $weeks[$w];
-		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, name => "$y-$m-$d", text => "$d", onClick => sub { chooseDayImage($_[0],$weeks[$w],"$y-$m-$d",$cat,$far,$butsize,0); } );
+		my $ymd = sprintf("%04d-%02d-%02d",$y,$m,$d);
+		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, name => $ymd, text => "$d", onClick => sub { chooseDayImage($_[0],$weeks[$w],$ymd,$cat,$far,$butsize,0); } );
 		push(@{ $out->{days} }, $a); # store for autofill
 		$pos++;
 		$d = "0$d" if $d < 10;
-		my $hr = $$schedh{$cat}{"$y-$m-$d"};
+		my $hr = $$schedh{$cat}{$ymd} if exists $$schedh{$cat}{$ymd}{url}; # might be {}, so we'll check for a url field.
 		if (defined $hr) { # if the date has an associated item in the dated.txt file...
 			my $url = $$hr{url};
 			my $tit = $$hr{title};
 			my $des = $$hr{desc};
 			my $error = PGK::buttonPic($a,$url,\$hitserver,$out);
+			if ($error) { # What went wrong?
+				if ($error == -1) {
+					warn "The buttonPic function did not receive a URL for $ymd";
+				}
+			}
 		} elsif (exists $args{auto} and $args{auto} == 1) {
 #			chooseDayImage($a,$weeks[$w],"$y-$m-$d",$cat,$far,$butsize,1);
 		} else {
@@ -263,6 +269,59 @@ sub showMonth {
 		$pos++;
 	}
 }
+print ".";
+
+sub seqPick {
+	my ($d,$c,$r,$f) = @_;
+	my $lib = (FIO::config('Disk','rotatedir') or "lib");
+	my $fn = $lib . "/" . $f;
+	my $valid = isReal($fn);
+	my (@s,$p,$index) = ((),0,0); # sequence position index
+	my $dt = sprintf("%02d",$d->text);
+	my $a = $$r{$c}{$dt}; # arrayref
+	my $x = scalar @{ $a }; # max is length of array
+#print "L: $x;";
+	$dt =~ m/(\d\d)/;
+	if (defined $1) {
+		$dt = int($1);
+	} else {
+		Common::infMes("$dt could not be parsed as a numeric",0,gobj => getGUI('status'),);
+		$valid = 0; # if we don't have a parsable day,return a random item.
+	}
+	unless ($valid) {
+		$index = rand(100000); # no valid sequence file =>> random choice
+	} else {
+		my $target = $dt;
+		my $current = 0;
+		my @lines = FIO::readFile($fn,getGUI('status'),0);
+		$current = ($target < scalar @lines) ? $target : scalar @lines;
+		my $ln = $lines[$current];
+		# process line
+		$ln =~ m/(\d+):(\d+),?+/;
+print "Results: $1 - $2 = $3 [ $4 ] $5 : $6 ; $7 < $8 > $9 ?";
+
+		my $in = int($1) + 1;
+		$ln =~ s/(\d+):/$in/;
+	}
+	my $pick = $$a[$index % $x];
+#skrDebug::dump($pick,"Pick $index",1);
+	return %{ $pick };
+}
+print ".";
+
+sub hashAutoPicks {
+	my ($par,$ch,$dt,$fr,$op,$cat,$autopicks) = @_;
+	$par->empty();
+	my $fn = "schedule/dated.txt";
+	my $schedcat = @{ $fr }[0]->{$cat};
+	foreach my $k (keys %$autopicks) {
+		next unless Common::isFuture($k);
+		$$schedcat{$k} = $$autopicks{$k};
+		main::howVerbose() and print "Picked: " . $$schedcat{$k}{title} . "...";
+	}
+	showMonth($ch,$dt,$fr,$op,$cat);
+}
+print ".";
 
 sub showMonthly {
 	my ($gui,$bgcolor,$filarrref) = @_;
@@ -281,34 +340,68 @@ sub showMonthly {
 	$output->{days} = []; # needed for autofill button
 	my %sched = %{ $$filarrref[0] };
 	my @categories = keys %sched;
-	my $catter = $picker->insert( ComboBox => style => cs::DropDown, height => 35, items => \@categories, text => $categories[0] );
+	my $bbox = $pane->insert( HBox => name => "buttons", pack => Sui::passData('rowopts') );
+	my $prev = $win->insert( VBox => name => "Autopick", pack => Sui::passData('rowopts'), ); # create a pane
+	my $seqer = $bbox->insert( InputLine => text => $categories[0] . ".seq" );
+	my $catter = $picker->insert( ComboBox => style => cs::DropDown, height => 35, items => \@categories, text => $categories[0], onChange => sub { $seqer->text($_[0]->text . ".seq"); }, );
 	my $monther = $picker->insert( ComboBox => style => cs::DropDownList, height => 35, growMode => gm::GrowLoX | gm::GrowLoY, items => $months, onChange => sub { $date->set(month => $_[0]->focusedItem + 1); showMonth($calhome,$date,$filarrref,$output,$catter->text); }, text => $$months[$date->month() - 1], );
 	$picker->insert( SpinEdit => name   => 'Year', min    => 1900, max => 2099, growMode => gm::GrowLoX | gm::GrowLoY, value => $date->year, onChange => sub { $date->set(year => $_[0]->value()); showMonth($calhome,$date,$filarrref,$output,$catter->text); } );
 	$picker->insert( Label => text => " at the regular time " );
 	my $first = (scalar @categories ? ( keys %{ $sched{$categories[0] } } )[0] : "");
 	my %ex = (scalar @categories ? %{ $sched{$categories[0]}{"$first"} } : ());
-skrDebug::dump(\%ex,"EX",1);
 	my $timer = $picker->insert( InputLine => text => ($ex{time} or "0800" ) );
 	showMonth($calhome,$date,$filarrref,$output,$catter->text);
-	my $bbox = $pane->insert( HBox => name => "buttons" );
 	$bbox->insert( Button => text => "Autofill", onClick => sub {
+		my ($r,$c,$w) = (1,0,7);
+		my $reg = @{ $filarrref }[1];
+		my $cat = $catter->text;
 		foreach my $d (@{ $output->{days} }) {
-			print "\n" . $d->text . ": " . $sched{$catter->text}{$d->name}{url} . "..." if exists $sched{$catter->text}{$d->name}{url};
+			print "\n" . $d->text . ": " . $sched{$cat}{$d->name}{url} . "..." if exists $sched{$cat}{$d->name}{url};
 		}
 		# run showmonth with a flag telling it to choose a random item from each day's list of regulars
-		# run through $output->{days}...
-		devHelp($pane,"Autofilling the month");
+		$prev->empty();
+		my $row = $prev->insert( HBox => name => "Row $r", pack => Sui::passData('rowopts'), );
+		my %picks;
+		foreach my $day (@{$output->{days}}) { # run through $output->{days}...
+			print "\n" . $day->text . ": ";
+			if (exists $sched{$cat}{$day->name}{url}) {
+		# if an image is already chosen, use that
+				print $sched{$cat}{$day->name}{url} . "...";
+				my ($us,$x) = ($sched{$cat}{$day->name}{url},0);
+				$row->insert( Button => text => $day->text . ": " . $sched{$cat}{$day->name}{title}, onClick => sub { PGK::buttonPic($day,$us,\$x); } );
+			} elsif (exists $$reg{$cat}{sprintf("%02d",$day->text)} and Common::isFuture($day->name)) {
+		# or choose an image for each day and hash it in the dated DB.
+				my %pick = seqPick($day,$cat,$reg,$seqer->text);
+				$picks{$day->name} = \%pick; # save for later saving
+		# show a label for each image chosen
+				$row->insert( Button => text => $day->text . ": " . $pick{title}, onClick => sub { hashAndPic($pick{url},$pick{title},$pick{desc},$cat,$sched{$cat}{$day->name},undef,undef,$day); }, );
+			} else {
+				$c--; # to prevent huge blank spaces in the output pane.
+			}
+			$c++;
+			if ($c >= $w) {
+				$c = 0;
+				$r++;
+				$row = $prev->insert( HBox => name => "Row $r", pack => Sui::passData('rowopts'), );
+			}
+		}
+		# show a button to save these autopicks to the dated.txt file
+		my $scbox = $prev->insert( HBox => name => "SaveCancel" );
+		$scbox->insert( Button => text => "Cancel", onClick => sub { $prev->empty(); } );
+		$scbox->insert( Button => text => "Save dated", onClick => sub { hashAutoPicks($prev,$calhome,$date,$filarrref,$output,$catter->text,\%picks); } );
 	} );
 	$bbox->insert( Button => text => "Cancel", onClick => sub {
 		my $stat = getGUI('status');
 		$stat->push("Aborting monthly schedule.");
 		Pfresh();
+		$prev->destroy();
 		$pane->destroy();
 		$note->show();
 		} );
 	$bbox->insert( Button => text => "Save", onClick => sub {
 		my $stat = getGUI('status');
 		my $fn = "schedule/dated.txt";
+		$prev->destroy();
 		$stat->push("Appending post to $fn...");
 		$_[0]->text("Saving schedule...");
 		$_[0]->set( enabled => 0 );
@@ -322,7 +415,8 @@ skrDebug::dump(\%ex,"EX",1);
 			foreach my $d (sort keys %dates ) {
 				my %fields = %{ $hash{$c}{$d} };
 				unless (defined $fields{url} && defined $fields{title} && defined $fields{desc} ) {
-					my $es = "Subject hash does not contain all required data " . Common::lineNo(2);
+skrDebug::dump(\%fields,"Fields");
+					my $es = "Subject hash passed to Save button does not contain all required data " . Common::lineNo(2);
 					print "$es\n";
 					$stat->push($es);
 					next;
@@ -344,13 +438,13 @@ skrDebug::dump(\%ex,"EX",1);
 				foreach my $i ( @{ $hash{$c}{$d} } ) {
 					my %fields = %{ $i };
 					unless (defined $fields{url} && defined $fields{title} && defined $fields{desc} ) {
-						my $es = "Subject hash does not contain all required data " . Common::lineNo(2);
+skrDebug::dump(\%fields,"Fields");
+						my $es = "Subject hash in ref within Save button does not contain all required data " . Common::lineNo(2);
 						print "$es\n";
 						$stat->push($es);
 						next;
 					}
 					push(@lines,"day=" . $d . ">image=" . $fields{url} . ">title=" . $fields{title} . ">desc=" . $fields{desc} . ">time=" . $timestr . ">cat=" . $c . ">");
-#print Dumper $filarrref;
 				}
 			}
 		}
@@ -443,6 +537,7 @@ $text");
 		Pfresh();
 		my $review = $target->insert( VBox => name => 'review', pack => { fill => 'both', expand => 1 });# VBox to hold RItems
 		$review->insert( Label => text => "Reviewing RSS feed is not yet coded. Sorry." );
+############### MARKER #############
 		$rss = previewRSS($rss,$review,$pbbox,$output,@existing); # each existing RSS item will be loaded, given a different background color than generated items.
 		# save button to write items to RSS
 		$target->insert( Button => text => "Save", onClick => sub { $_[0]->destroy(); saveItAsIs($rss,$ofn,$output,$target,$bgcol); } );
@@ -458,6 +553,7 @@ sub previewRSS {
 	my ($rss,$to,$gb,$out,@existing) = @_;
 	my $bg = Sui::passData('background');
 	my $bg2 = 0;
+############# MARKER #############
 skrDebug::dump(\@existing,"Existing");
 	# each existing RSS item will be loaded, given a different background color than generated items.
 	# each RItem row should have a button to remove that item.
@@ -690,7 +786,7 @@ sub saveSequence {
 	foreach my $i (@_) {
 		next unless (ref $i eq "RItem"); # make sure we only use RItems.
 		unless (defined $i->link && defined $i->title && defined $i->text) {
-			my $es = "Subject RItem does not contain all required data " . Common::lineNo(2);
+			my $es = "Subject RItem  passed to saveSequence does not contain all required data " . Common::lineNo(2);
 			print "$es\n";
 			$stat->push($es);
 			next;
@@ -737,7 +833,7 @@ sub saveDatedSequence {
 #		print "$l,";
 		next unless (ref $i eq "RItem"); # make sure we only use RItems.
 		unless (defined $i->link && defined $i->title && defined $i->text) {
-			my $es = "Subject RItem does not contain all required data " . Common::lineNo(2);
+			my $es = "Subject RItem passed to saveDatedSequence does not contain all required data " . Common::lineNo(2);
 			print "$es\n";
 			$stat->push($es);
 			next;
@@ -1752,6 +1848,11 @@ print ".";
 
 sub fetchapic { # fetches an image from the cache, or from the server if it's not there.
 	my ($line,$hitserver,$stat,$target) = @_;
+	unless ($line) {
+		warn "\nUndefined line passed to fetchapic.\n";
+		Common::traceMe(3);
+		return (0,"","","");
+	}
 	$line =~ /(https?:\/\/)?([\w-]+\.[\w-]+\.\w+\/|[\w-]+\.\w+\/)(.*\/)*(\w+\-*\w+\.?\w{3})/;
 	my $server = ($2 or "");
 	my $img = ($4 or "");

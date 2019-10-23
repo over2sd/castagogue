@@ -1977,6 +1977,7 @@ sub buttonPic {
 	my $page = undef; # replace later with error panel
 	Pfresh();
 	my $viewsize = 75;
+	return -1 unless defined $url; # skip errors from not getting a URL
 	my ($error,$server,$img,$lfp) = PGUI::fetchapic($url,$hitserver,$stat,$page);
 	return $error if $error;
 	if (-r $lfp . $img ) {

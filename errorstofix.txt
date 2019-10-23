@@ -2,3 +2,5 @@ Illegal object reference passed to Component.get_components at /usr/local/lib/i3
 After saving group and clicking create new group file, then trying to add an item to a row with the >>>> button.
 Adding page 0 / 0...DoneCan't locate object method "insert" via package "filename.dsc" (perhaps you forgot to load "filename.dsc"?) at modules/PGUI.pm line 1376.
 can't call method widgetd on ublessed ref PGUI 771 after Produce Sequence button press.
+Subject hash warnings even though save is working properly. See PGUI 416 and 439
+

@@ -3,7 +3,7 @@ package FIO;
 use Config::IniFiles;
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT = qw( config saveConf loadConf );
+@EXPORT = qw( config saveConf loadConf isReal );
 print __PACKAGE__;
 require Common;
 
@@ -208,6 +208,12 @@ sub dir2arr {
 	closedir(DIR);
 #print scalar @files . " files found.";
 	return @files; # return array of file names.
+}
+print ".";
+
+sub isReal {
+	return 0 unless (-e shift && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
+	return 1;
 }
 print ".";
 

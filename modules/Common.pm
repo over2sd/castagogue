@@ -3,7 +3,7 @@ print __PACKAGE__;
 
 use strict;
 use Exporter qw(import);
-our @EXPORT = qw( infMes getColorsbyName missing );
+our @EXPORT_OK = qw( infMes getColorsbyName missing );
 use Sui qw( passData );
 
 my $debug = main::howVerbose();
@@ -432,7 +432,8 @@ print ".";
 sub infMes {
 	my ($text,$continue,%args) = @_;
 	defined $continue and $args{continues} = $continue;
-	Common::errorOut('inline',0,color => 1, fatal => 0, string => "\n[I] $text", %args);
+	my $nl = ($args{noleading} ? "" : "\n");
+	Common::errorOut('inline',0,color => 1, fatal => 0, string => "${nl}[I] $text", %args);
 }
 print ".";
 
@@ -452,14 +453,16 @@ print ".";
 sub traceMe {
 	my ($deep,$max) = @_;
 	defined($max) or $max = 5;
-	my $me = (caller(0))[3];
-	my $caller = lineNo(1);
-	infMes("$me, called by" . $caller,{continues => 1});
+	my $me = (caller(1))[3];
+	my $caller = lineNo(2);
+	$caller = substr($caller,3,-2);
+	infMes("$me, called by" . $caller,{noleading => 1, continues => 1});
 	if ($deep) {
 		my $loop = 1;
-		my $depth = 2;
+		my $depth = 3;
 		while ($loop and ($depth < $max)) {
 			my $caller2 = lineNo($depth);
+			$caller2 = substr($caller2,3,-2);
 			print "\tcalled by $caller2";
 			$loop--;
 			$depth++;
@@ -745,7 +748,7 @@ sub lineNo {
 		$sub = "(MAIN)";
 		$top = 1;
 	}
-	my $string = qq{ at line $line of $sub in $file.\n };
+	my $string = qq{ at line $line of $sub in $file };
 	if ($recursing) {
 		(length($input) > 2) and ($input = substr($input,0,-3));
 		return ("$input,$string",$top);
@@ -753,7 +756,7 @@ sub lineNo {
 #	my $showme = shift;
 #	$ident = ($showme ? "$ident " : "");
 #	return qq{$ident at line $line of $sub in $file.\n };
-	return $string;
+	return $string . ".\n";
 }
 print ".";
 
@@ -842,6 +845,17 @@ sub dateConv {
 		my $datestr = "$y-$m-$d";
 		return (DateTime::Format::DateParse->parse_datetime( $datestr ),$y,$m,$d);
 	}
+}
+print ".";
+
+sub isFuture {
+	my $date = shift;
+	my ($dt,$y,$m,$d) = dateConv($date); # Convert so we're on the same starting point whether it's a string or a DateTime
+	my $today = DateTime->now();
+	my ($dt2,$y2,$m2,$d2) = dateConv($today);
+	my $future = ($today < $dt);
+	print "$y2-$m2-$d2 is " . ($future ? "earlier" : "later") . " than $y-$m-$d.\n";
+	return $future;
 }
 print ".";
 
