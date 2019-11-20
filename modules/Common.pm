@@ -850,11 +850,12 @@ print ".";
 
 sub isFuture {
 	my $date = shift;
+	my $todayfuture = shift;
 	my ($dt,$y,$m,$d) = dateConv($date); # Convert so we're on the same starting point whether it's a string or a DateTime
 	my $today = DateTime->now();
 	my ($dt2,$y2,$m2,$d2) = dateConv($today);
-	my $future = ($today < $dt);
-	print "$y2-$m2-$d2 is " . ($future ? "earlier" : "later") . " than $y-$m-$d.\n";
+	my $future = ($todayfuture ? ($today <= $dt) : ($today < $dt)); # Today is in the past; we're not going to 
+	main::howVerbose() and print "$y2-$m2-$d2 is " . ($future ? "earlier" : "later") . " than $y-$m-$d.\n" or print ($future ? "+D" : "D-") . "\n";
 	return $future;
 }
 print ".";

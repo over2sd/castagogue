@@ -28,8 +28,6 @@ A library of functions used to build and manipulate the program's Prima user int
 
 =cut
 
-package PGUI;
-
 my @openfiles = [];
 
 =item buildPageOf TARGET COUNT OFFSET EXTRAS LIST
@@ -43,6 +41,7 @@ Expects EXTRAS to be a hashref that contains, at minimum:
 
 =cut
 
+#TODO: Move this into Pager package.
 sub buildPageOf { # start of button populator. I need to have a generic version of this for the Pager class.
 	my ($target,$count,$offset,$extras,@list) = @_;
 	my $length = scalar @list -1;
@@ -57,548 +56,6 @@ sub buildPageOf { # start of button populator. I need to have a generic version 
 		$target->insert(Button => text => $list[$i] );
 	}
 }
-
-#-=-=-=-=-=-=-=-=-=-=-=-=- Executor start
-sub hashAndPic {
-	my ($us,$ts,$ds,$cs,$sh,$rh,$date,$tarobj,$parobj) = @_;
-	# also, store values in scheduled hash
-#	my ($x1,$x2,$x3,$day) = Common::dateConv($date);
-	$$sh{url} = $us; $$sh{title} = $ts; $$sh{desc} = $ds;
-	$parobj and $parobj->close();
-	my $x = 0;
-	return PGK::buttonPic($tarobj,$us,\$x);
-}
-#-=-=-=-=-=-=-=-=-=-=-=-=- Executor end
-
-
-sub chooseDayImage  {
-	my ($b,$p,$date,$cat,$ar,$bsz,$auto) = @_;
-	Sui::storeData('contextdet',"Monthly");
-	my ($sch,$rgh) = @$ar; # pull Sched and Reg from ARef
-	my ($w,$h) = (640,580);
-	my $bw = $w / 9; # button widths
-	my $tl = 16; # text length
-	my $n = 0;
-	my ($x,$y,$m,$day) = Common::dateConv($date);
-	if ($auto) { # skip UI elements
-		print "Choosing automatically for $y-$m-$day:$cat...";
-		return unless defined $$rgh{$cat}{$day}; 
-		my $array_length = scalar @{ $$rgh{$cat}{$day} };
-		return 0 unless $array_length > 0;
-		my $rpc = int(rand(512)) % $array_length;
-		my ($u,$t,$d) = ($$rgh{$cat}{$day}[$rpc]{url},$$rgh{$cat}{$day}[$rpc]{title},$$rgh{$cat}{$day}[$rpc]{desc});
-		print "$u.\n";
-skrDebug::dump($$rgh{$cat}{$day},"Day of $cat $rpc",1);
-		$$sch{$cat} = {} unless exists $$sch{$cat};
-		$$sch{$cat}{"$y-$m-$day"} = {} unless exists $$sch{$cat}{"$y-$m-$day"};
-		my $s = $$sch{$cat}{"$y-$m-$day"};
-		hashAndPic($u,$t,$d,$cat,$s,$rgh,$day,$b,$p); # choose the image selected
-	}
-	# make a dialog box
-	my $box = PGK::quickBox($p,"Choose an image",$w,$h);
-	# display the day of the month
-	my $dayth = Common::ordinal($day);
-	my $lktext = "Images in category '$cat' for the $dayth of the month";
-	$box->{mybox}->insert( Label => text => $lktext);
-	my $target = $box->{mybox}->insert( HBox => name => "row" );
-	# first, make a button for adding images to the given day
-	$box->{count} = 0;
-	#-------------------------------------Callback Start
-	sub myCallback {
-		my ($target,$parent,$row,$mar,$cat,$date,$l) = @_;
-		# When pressed, open an askbox for the url, title, and description (date and category are set by caller of this function)
-		my %ans = PGK::askbox($row,"Enter Image Details",{},"url","URL:","title","Title:","desc","Description:");
-		return 0 unless (exists $ans{url} and exists $ans{title} and exists $ans{desc} and $ans{url} ne '');
-		my ($u,$t,$d) = ($ans{url},$ans{title},$ans{desc});
-#print "u: $u t: $t d: $d;...";
-		# once information is entered, make a new button for the new image.
-		my ($sh,$rh) = @$mar;
-		$$rh{$cat} = {} unless exists $$rh{$cat};
-		my ($x,$y,$m,$day) = Common::dateConv($date);
-		$$rh{$cat}{$day} = [] unless exists $$rh{$cat}{$day};
-		my $h = { url => $u, title => $t, desc => $d };
-		push(@{ $$rh{$cat}{$day} },$h);
-		myButton($parent,$row,$target,$mar,$u,$t,$d,$cat,$date,$l,1);
-		return 1;
-	}
-	#------------------------------------Callback End
-	$target->insert( Button => text => "Add an Image", onClick => sub { # add button
-			$box->{count} += myCallback($b,$box,$target,$ar,$cat,$x,$tl);
-		} );
-	$box->{count}++; # library button gets counted.
-	#================================== Button Start
-	sub myButton {
-		my ($parent,$row,$target,$mar,$u,$t,$d,$cat,$date,$l,$newchoice) = @_;
-		print Common::lineNo();
-		my ($sch,$rgh) = @$mar;
-		my ($dt,$y,$m,$day) = Common::dateConv($date);
-		$$sch{$cat} = {} unless exists $$sch{$cat};
-		$$sch{$cat}{"$y-$m-$day"} = {} unless exists $$sch{$cat}{"$y-$m-$day"};
-		my $s = $$sch{$cat}{"$y-$m-$day"};
-		$row->insert( Button => text => Common::shorten($t,($l or 20),4), onClick => sub {
-			hashAndPic($u,$t,$d,$cat,$s,$rgh,$date,$target,$parent);
-		} );
-		if ( $newchoice ) {
-			$$rgh{$cat} = {} unless exists $$rgh{$cat};
-			$$rgh{$cat}{$day} = [] unless exists $$rgh{$cat}{$day};
-			my $h = { url => $u, title => $t, desc => $d };
-			push(@{ $$rgh{$cat}{$day} },$h);
-		}
-		$parent->{count}++;
-		if ($parent->{count} > 3) {
-			$parent->{count} = 0;
-			$row = $parent->{mybox}->insert( HBox => name => "row" );
-		}
-	}
-	#===================================== Button End
-	$target->insert( Button => text => "Add from library", onClick => sub {
-	
-### MAKE THIS use Pager with buttons
-#devHelp($box,"Adding from the library"); return;
-		$box->{mybox}->hide();
-		my $stage = $box->insert( HBox => name => "stager", pack => { fill => 'both' }, );
-		PGK::grow($stage, boxfill => 'y', boxex => 1, margin => 7);
-		$stage->insert( Label => text => "Choosing an image to add as an option for the $dayth of the month." );
-		my $chooser = $stage->insert( VBox => name => "chooser");
-		PGK::grow($chooser, boxfill => 'y', boxex => 1, margin => 7);
-		$chooser->insert( Label => text => "Choose a file of image descriptions:");
-		# list DSC files in library
-		my $tar = [];
-		my $sched = 2;
-		my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
-		$stage->insert(Label => text => " ???", pack => { fill => 'both', expand => 1, }, );
-		# on click, destroy this box and list images in DSC file
-		# on click, destroy that box and add button to $target with myButton
-		# make sure this new image gets added to the regular list (calendar.txt)
-		my $extra = {
-			target => $target,
-			parent => $p,
-			button => $b,
-			date => $date,
-			category => $cat,
-			ar => $ar,
-			size => $bsz,
-			cbsub => \&myButton,
-			covers => $box->{mybox},
-			control => $stage,
-			dialog => $box,
-			trim => $tl,
-			newchoice => 1,
-			pagelen => 12,
-			nocaption => 1,
-		};
-		refreshDescList($chooser,$prev,$tar,$sched,$extra);
-	} );
-	# read regular files for date given
-print "Day: $day -=- ";
-skrDebug::dump($$rgh{$cat});
-	foreach my $i ( @{ $$rgh{$cat}{$day} } ) {
-		# display a button for each
-		myButton($box,$target,$b,$ar,$$i{url},$$i{title},$$i{desc},$cat,$x,$tl,0);
-		# when the button is pressed, select it as the image for the given button and close the dialog
-	}
-	$box->execute();
-}
-print ".";
-
-sub showMonth {
-	my @days_in_months = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
-	my ($target,$date,$far,$out,$cat,%args) = @_;
-	$target->empty();
-	$out->{days} = []; # clear storage for refresh
-	my $stat = getGUI('status');
-	$date->set( day => 1); # find first day...
-	print "Showing " . $date->ymd . ": $cat...";
-	my $firstweekday = $date->dow(); # ...so we can see which day the month starts on
-	$firstweekday = 0 if $firstweekday == 7;
-	my @weeks = ();
-	my $count = 6;
-	my $butsize = (FIO::config('UI','caldaysize') or 100);
-	my $hitserver = 0;
-	my $moment = 7;
-	while ($count > 0) {
-		$count--;
-		my $name = "week $count";
-		push(@weeks,$target->insert( HBox => name => $name, width => ($butsize * 7 + 7), height => ($butsize + 2)));
-	}
-	my $pos = 0;
-	my $w = 0;
-	while ($pos < $firstweekday) {
-		my $row = $weeks[$w];
-		$weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "", );
-		$pos++;
-	}
-	my ($schedh,$regh) = @$far;
-	my ($x1,$y,$m,$x2) = Common::dateConv($date); # DateTime => (datetime,scalar,scalar,scalar)
-	foreach my $d (1 .. $days_in_months[$date->month - 1]) {
-		my $row = $weeks[$w];
-		my $ymd = sprintf("%04d-%02d-%02d",$y,$m,$d);
-		my $a = $weeks[$w]->insert( Button => width=> $butsize, height => $butsize, name => $ymd, text => "$d", onClick => sub { chooseDayImage($_[0],$weeks[$w],$ymd,$cat,$far,$butsize,0); } );
-		push(@{ $out->{days} }, $a); # store for autofill
-		$pos++;
-		$d = "0$d" if $d < 10;
-		my $hr = $$schedh{$cat}{$ymd} if exists $$schedh{$cat}{$ymd}{url}; # might be {}, so we'll check for a url field.
-		if (defined $hr) { # if the date has an associated item in the dated.txt file...
-			my $url = $$hr{url};
-			my $tit = $$hr{title};
-			my $des = $$hr{desc};
-			my $error = PGK::buttonPic($a,$url,\$hitserver,$out);
-			if ($error) { # What went wrong?
-				if ($error == -1) {
-					warn "The buttonPic function did not receive a URL for $ymd";
-				}
-			}
-		} elsif (exists $args{auto} and $args{auto} == 1) {
-#			chooseDayImage($a,$weeks[$w],"$y-$m-$d",$cat,$far,$butsize,1);
-		} else {
-			# load placeholder image
-		}
-		if ($hitserver) {
-			$stat->push("Waiting...");
-			Pwait($moment);
-			$hitserver = 0;
-		}
-		if ($pos > 6) {
-			$pos = 0;
-			$w++;
-		}
-	}
-	while ($pos != 0 && $pos < 7) {
-		my $row = $weeks[$w];
-		$weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "X", onClick => sub { print "I'm in " . $row->name . "..."; } );
-		$pos++;
-	}
-}
-print ".";
-
-sub seqPick {
-	my ($d,$c,$r,$f) = @_;
-	my $lib = (FIO::config('Disk','rotatedir') or "lib");
-	my $fn = $lib . "/" . $f;
-	my $valid = isReal($fn);
-	my (@s,$p,$index) = ((),0,0); # sequence position index
-	my $dt = sprintf("%02d",$d->text);
-	my $a = $$r{$c}{$dt}; # arrayref
-	my $x = scalar @{ $a }; # max is length of array
-#print "L: $x;";
-	$dt =~ m/(\d\d)/;
-	if (defined $1) {
-		$dt = int($1);
-	} else {
-		Common::infMes("$dt could not be parsed as a numeric",0,gobj => getGUI('status'),);
-		$valid = 0; # if we don't have a parsable day,return a random item.
-	}
-	unless ($valid) {
-		$index = rand(100000); # no valid sequence file =>> random choice
-	} else {
-		my $target = $dt;
-		my $current = 0;
-		my @lines = FIO::readFile($fn,getGUI('status'),0);
-		$current = ($target < scalar @lines) ? $target : scalar @lines;
-		my $ln = $lines[$current];
-		# process line
-		$ln =~ m/(\d+):(\d+),?+/;
-print "Results: $1 - $2 = $3 [ $4 ] $5 : $6 ; $7 < $8 > $9 ?";
-
-		my $in = int($1) + 1;
-		$ln =~ s/(\d+):/$in/;
-	}
-	my $pick = $$a[$index % $x];
-#skrDebug::dump($pick,"Pick $index",1);
-	return %{ $pick };
-}
-print ".";
-
-sub hashAutoPicks {
-	my ($par,$ch,$dt,$fr,$op,$cat,$autopicks) = @_;
-	$par->empty();
-	my $fn = "schedule/dated.txt";
-	my $schedcat = @{ $fr }[0]->{$cat};
-	foreach my $k (keys %$autopicks) {
-		next unless Common::isFuture($k);
-		$$schedcat{$k} = $$autopicks{$k};
-		main::howVerbose() and print "Picked: " . $$schedcat{$k}{title} . "...";
-	}
-	showMonth($ch,$dt,$fr,$op,$cat);
-}
-print ".";
-
-sub showMonthly {
-	my ($gui,$bgcolor,$filarrref) = @_;
-	
-	my $win = $$gui{mainWin};
-	my $note = $$gui{pager};
-	$note->hide();
-	my $pane = $win->insert( VBox => name => "monthly");
-	my $rows = $pane->insert( VBox => name => "rows");
-	$pane->backColor(PGK::convertColor($bgcolor));
-	my $picker = $rows->insert( HBox => name => "monthpick");
-	my $date = DateTime->now;
-	my $months = [ "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-	my $calhome = $rows->insert( VBox => name => 'Calendar');
-	my $output = $picker->insert( InputLine => text => "");
-	$output->{days} = []; # needed for autofill button
-	my %sched = %{ $$filarrref[0] };
-	my @categories = keys %sched;
-	my $bbox = $pane->insert( HBox => name => "buttons", pack => Sui::passData('rowopts') );
-	my $prev = $win->insert( VBox => name => "Autopick", pack => Sui::passData('rowopts'), ); # create a pane
-	my $seqer = $bbox->insert( InputLine => text => $categories[0] . ".seq" );
-	my $catter = $picker->insert( ComboBox => style => cs::DropDown, height => 35, items => \@categories, text => $categories[0], onChange => sub { $seqer->text($_[0]->text . ".seq"); }, );
-	my $monther = $picker->insert( ComboBox => style => cs::DropDownList, height => 35, growMode => gm::GrowLoX | gm::GrowLoY, items => $months, onChange => sub { $date->set(month => $_[0]->focusedItem + 1); showMonth($calhome,$date,$filarrref,$output,$catter->text); }, text => $$months[$date->month() - 1], );
-	$picker->insert( SpinEdit => name   => 'Year', min    => 1900, max => 2099, growMode => gm::GrowLoX | gm::GrowLoY, value => $date->year, onChange => sub { $date->set(year => $_[0]->value()); showMonth($calhome,$date,$filarrref,$output,$catter->text); } );
-	$picker->insert( Label => text => " at the regular time " );
-	my $first = (scalar @categories ? ( keys %{ $sched{$categories[0] } } )[0] : "");
-	my %ex = (scalar @categories ? %{ $sched{$categories[0]}{"$first"} } : ());
-	my $timer = $picker->insert( InputLine => text => ($ex{time} or "0800" ) );
-	showMonth($calhome,$date,$filarrref,$output,$catter->text);
-	$bbox->insert( Button => text => "Autofill", onClick => sub {
-		my ($r,$c,$w) = (1,0,7);
-		my $reg = @{ $filarrref }[1];
-		my $cat = $catter->text;
-		foreach my $d (@{ $output->{days} }) {
-			print "\n" . $d->text . ": " . $sched{$cat}{$d->name}{url} . "..." if exists $sched{$cat}{$d->name}{url};
-		}
-		# run showmonth with a flag telling it to choose a random item from each day's list of regulars
-		$prev->empty();
-		my $row = $prev->insert( HBox => name => "Row $r", pack => Sui::passData('rowopts'), );
-		my %picks;
-		foreach my $day (@{$output->{days}}) { # run through $output->{days}...
-			print "\n" . $day->text . ": ";
-			if (exists $sched{$cat}{$day->name}{url}) {
-		# if an image is already chosen, use that
-				print $sched{$cat}{$day->name}{url} . "...";
-				my ($us,$x) = ($sched{$cat}{$day->name}{url},0);
-				$row->insert( Button => text => $day->text . ": " . $sched{$cat}{$day->name}{title}, onClick => sub { PGK::buttonPic($day,$us,\$x); } );
-			} elsif (exists $$reg{$cat}{sprintf("%02d",$day->text)} and Common::isFuture($day->name)) {
-		# or choose an image for each day and hash it in the dated DB.
-				my %pick = seqPick($day,$cat,$reg,$seqer->text);
-				$picks{$day->name} = \%pick; # save for later saving
-		# show a label for each image chosen
-				$row->insert( Button => text => $day->text . ": " . $pick{title}, onClick => sub { hashAndPic($pick{url},$pick{title},$pick{desc},$cat,$sched{$cat}{$day->name},undef,undef,$day); }, );
-			} else {
-				$c--; # to prevent huge blank spaces in the output pane.
-			}
-			$c++;
-			if ($c >= $w) {
-				$c = 0;
-				$r++;
-				$row = $prev->insert( HBox => name => "Row $r", pack => Sui::passData('rowopts'), );
-			}
-		}
-		# show a button to save these autopicks to the dated.txt file
-		my $scbox = $prev->insert( HBox => name => "SaveCancel" );
-		$scbox->insert( Button => text => "Cancel", onClick => sub { $prev->empty(); } );
-		$scbox->insert( Button => text => "Save dated", onClick => sub { hashAutoPicks($prev,$calhome,$date,$filarrref,$output,$catter->text,\%picks); } );
-	} );
-	$bbox->insert( Button => text => "Cancel", onClick => sub {
-		my $stat = getGUI('status');
-		$stat->push("Aborting monthly schedule.");
-		Pfresh();
-		$prev->destroy();
-		$pane->destroy();
-		$note->show();
-		} );
-	$bbox->insert( Button => text => "Save", onClick => sub {
-		my $stat = getGUI('status');
-		my $fn = "schedule/dated.txt";
-		$prev->destroy();
-		$stat->push("Appending post to $fn...");
-		$_[0]->text("Saving schedule...");
-		$_[0]->set( enabled => 0 );
-		Pfresh();
-		my @lines = ();
-		my %hash = %{ @{ $filarrref }[0] };
-		$timer->text =~ /(\d\d\d\d)/;
-		my $timestr = $1;
-		foreach my $c ( sort keys %hash ) {
-			my %dates = %{ $hash{$c} };
-			foreach my $d (sort keys %dates ) {
-				my %fields = %{ $hash{$c}{$d} };
-				unless (defined $fields{url} && defined $fields{title} && defined $fields{desc} ) {
-skrDebug::dump(\%fields,"Fields");
-					my $es = "Subject hash passed to Save button does not contain all required data " . Common::lineNo(2);
-					print "$es\n";
-					$stat->push($es);
-					next;
-				}
-				$fields{desc} =~ s/\s+^//; # trim trailing whitespace
-				push(@lines,"date=" . $d . ">image=" . $fields{url} . ">title=" . $fields{title} . ">desc=" . $fields{desc} . ">time=" . $timestr . ">cat=" . $c . ">");
-			}
-		}
-		my $err = FIO::writeLines($fn,\@lines,1);
-		$stat->push($err ? "Error when saving: $!" : "Schedule saved.");
-		$_[0]->text("Saving calendar...");
-		Pfresh();
-		@lines = ();
-		$fn = "schedule/calendar.txt";
-		%hash = %{ @{ $filarrref }[1] };
-		foreach my $c ( sort keys %hash ) {
-			my %dates = %{ $hash{$c} };
-			foreach my $d (sort keys %dates ) {
-				foreach my $i ( @{ $hash{$c}{$d} } ) {
-					my %fields = %{ $i };
-					unless (defined $fields{url} && defined $fields{title} && defined $fields{desc} ) {
-skrDebug::dump(\%fields,"Fields");
-						my $es = "Subject hash in ref within Save button does not contain all required data " . Common::lineNo(2);
-						print "$es\n";
-						$stat->push($es);
-						next;
-					}
-					push(@lines,"day=" . $d . ">image=" . $fields{url} . ">title=" . $fields{title} . ">desc=" . $fields{desc} . ">time=" . $timestr . ">cat=" . $c . ">");
-				}
-			}
-		}
-		$err = FIO::writeLines($fn,\@lines,1);
-		$stat->push($err ? "Error when saving: $!" : "Regular options saved.");
-		$_[0]->text("Closing...");
-		$_[0]->set( enabled => 0 );
-		Pfresh();
-		$pane->destroy();
-		$note->show();
-	} );
-}
-print ".";
-
-sub saveItAsIs {
-	my ($rss,$ofn,$output,$target,$bgcol) = @_;
-	($rss->save($ofn) ? $output->push("$ofn saved.") : $output->push("$ofn could not be saved."));
-	unless (FIO::config('Disk','persistentnext')) { print "nextID was " . FIO::cfgrm('Main','nextid',undef); } # reset nextID if we want to get it from the file each time.
-	FIO::saveConf();
-	$target->insert( Button => text => "Continue", onClick => sub { resetPublishing([$target,$bgcol]); } );
-}
-
-sub toRSSfromGUI {
-	my ($target,$inf,$outf,$dfrom,$dto,$nextb,$victim1,$victim2,$bgcol) = @_;
-	my $bg = Sui::passData('background');
-	my $process = "process an RSS feed";
-	my $ifn = $inf->text();
-	my $ofn = $outf->text();
-	my $start = $dfrom->text();
-	my $end = $dto->text();
-	FIO::config('Disk','template',$ifn);
-	carpWithout($ifn,$process,"specify an input filename") and return;
-	carpWithout($ofn,$process,"specify a target filename") and return;
-	carpWithout($start,$process,"choose a starting date") and return;
-	carpWithout($end,$process,"choose an ending date") and return;
-# TODO: Check for valid files
-	if ($start eq "0000-00-00") { $start = "today"; }
-	if ($end eq "0000-00-00") { $end = "tomorrow"; }
-	print "Processing RSS feed out of $ifn into $ofn from $start to $end with ID of " . (defined $nextb and defined $nextb->value() ? $nextb->value() : "" ) . ".\n";
-	my $idsuggest = (defined $nextb->value() ? $nextb->value() : FIO::config('Main','nextid'));
-	FIO::config('Main','nextid',$idsuggest);
-	$victim1->destroy();
-	$victim2->destroy();
-	my $output = $target->insert( Edit => text => "", pack => { fill => 'both', expand => 1, } );
-	my $pbbox = $target->insert( VBox => backColor => $bg, pack => Sui::passData('rowopts'), );
-	$pbbox->insert(Label => text => "Preparation");
-	my $probar1 = $pbbox->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
-	$pbbox->insert(Label => text => "Processing");
-	my $probar2 = $pbbox->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 1);
-	$pbbox->insert(Label => text => "Total Progress");
-	my $probar3 = $pbbox->insert( Gauge => relief => gr::Raise, pack => Sui::passData('rowopts'), max => 3);
-	Pfresh();
-	sub Prima::Edit::push {
-		my ($self,$text) = @_;
-		my $lines = $self->{lines};
-		push(@$lines,"
-$text");
-		Pfresh();
-	}
-	sub Prima::Edit::append {
-		my ($self,$text) = @_;
-		my $lines = $self->{lines};
-		my $final = $$lines[-1];
-		$final = $final . $text;
-		$$lines[-1] = $final;
-		Pfresh();
-	}
-	require castRSS;
-	Pfresh();
-	my $status = getGUI('status');
-	Sui::storeData('opo',$output);
-	Sui::storeData('progress',$probar1);
-	my $rss = castRSS::prepare($ifn,$output,1);
-	my @existing = @{$rss->{items}}; # copy existing
-	# update main progress bar
-	$probar1->value($probar1->max()); # no matter what, we've left the prepare() function, so we're done with that.
-	$probar3->max($probar1->max + $probar2->max);
-	$probar3->value($probar1->value + $probar2->value);
-	Pfresh();
-	Sui::storeData('progress',$probar2);
-	my $error = castRSS::processRange($rss,$start,$end,$output,1);
-	# update main progress bar
-	$probar2->value($probar2->max()); # no matter what, we've left processRange(), so we're done with that step.
-	$probar3->max($probar1->max + $probar2->max);
-	$probar3->value($probar1->value + $probar2->value);
-	$output->push("Now contains " . $#{$rss->{items}} . " items...");
-#print $rss->as_string;
-	if (FIO::config('UI','preview')) {
-		$output->push("Loading items for review (see below).");
-		Pfresh();
-		my $review = $target->insert( VBox => name => 'review', pack => { fill => 'both', expand => 1 });# VBox to hold RItems
-		$review->insert( Label => text => "Reviewing RSS feed is not yet coded. Sorry." );
-############### MARKER #############
-		$rss = previewRSS($rss,$review,$pbbox,$output,@existing); # each existing RSS item will be loaded, given a different background color than generated items.
-		# save button to write items to RSS
-		$target->insert( Button => text => "Save", onClick => sub { $_[0]->destroy(); saveItAsIs($rss,$ofn,$output,$target,$bgcol); } );
-		Pfresh();
-	} else {
-		Pfresh();
-		saveItAsIs($rss,$ofn,$output,$target,$bgcol);
-	}
-}
-print ".";
-
-sub previewRSS {
-	my ($rss,$to,$gb,$out,@existing) = @_;
-	my $bg = Sui::passData('background');
-	my $bg2 = 0;
-############# MARKER #############
-skrDebug::dump(\@existing,"Existing");
-	# each existing RSS item will be loaded, given a different background color than generated items.
-	# each RItem row should have a button to remove that item.
-	# each RItem should have buttons to edit values.
-	Pfresh();
-	$gb->destroy(); # kill the gauge box
-	return $rss;
-}
-print ".";
-
-sub schedulePost {
-	my ($button,$target,$fields) = @_;
-	my $stat = getGUI('status');
-	my $fn = "schedule/dated.txt";
-	if ($$fields{calent}->text() eq "0000-00-00") { # did you forget to set the date?
-		$stat->push("A valid date is required to schedule a post!");
-		$$fields{calent}->set( backColor => ColorRow::stringToColor("#F00"), onChange => sub { $$fields{calent}->set( backColor => ColorRow::stringToColor("#FFF"), onChange => sub {}, ); }, );
-		return -1;
-	}
-	if ($$fields{catent}->text() eq "category") { # did you forget to set the category?
-		$stat->push("A valid category (even 'general') is required to schedule a post!");
-		$$fields{catent}->set( backColor => ColorRow::stringToColor("#F00"), onChange => sub { $$fields{catent}->set( backColor => ColorRow::stringToColor("#FFF"), onChange => sub {}, ); }, );
-		return -2;
-	}
-	$stat->push("Appending post to $fn...");
-	$button->text("Saving...");
-	$button->set( enabled => 0 );
-	Pfresh();
-	my @lines = ();
-	my $description = $$fields{desced}->text();
-	$description =~ s/\s+^//; # trim trailing whitespace
-	push(@lines,"date=" . $$fields{calent}->text() . ">image=" . $$fields{image}->text() . ">title=" . $$fields{titlent}->text() . ">desc=" . $description . ">time=" . $$fields{timent}->text() . ">cat=" . $$fields{catent}->text() . ">");
-	my $err = FIO::writeLines($fn,\@lines,0);
-	$stat->push($err ? "Error when saving: $!" : "Post saved.");
-	delete $$fields{image};
-	$target->empty();
-	my $titlestring = $$fields{titlent}->text();
-	$target->insert(Label => text => "Saved $titlestring to $fn.", backColor => ColorRow::stringToColor("#1f2"), pack => {fill => 'x', expand => 0, }, );
-	$target->insert(Label => text => " ", pack => { fill => 'y', expand => 1, }, );
-	$button->text("Schedule");
-	$button->set( enabled => 1 );
-	Pfresh();
-	return $err;
-}
-print ".";
 
 sub autoShelve { # A librarian shelves; this is going in a calendar library.
 	my ($rows,$fn,$ow,$oo) = @_;
@@ -675,178 +132,8 @@ sub showRecurLib {
 }
 print ".";
 
-
-=item resetScheduling TARGET
-
-Given a TARGET widget, generates the list widgets needed to perform the Scheduling page's functions.
-Returns 0 on completion.
-Dies on error opening library directory.
-
-=cut
-
-sub resetScheduling {
-	my ($args) = @_;
-	my $schpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
-	Sui::storeData('context',"Scheduling");
-	my $bgcol = $$args[1];
-	my $gui = getGUI();
-	$schpage->empty(); # start with a blank slate
-	my $panes = $schpage->insert( HBox => name => 'splitter',  pack => Sui::passData('paneopts'), );
-	my $lister = $panes->insert( VBox => name => "Input", pack => Sui::passData('listopts'), backColor => PGK::convertColor($bgcol),  );
-	$lister->insert( Label => text => "Choose a file of image descriptions:");
-	my $tar = [];
-	my $sched = 1;
-	my $stage = $panes->insert( VBox => name => "stager", pack => { fill => 'both' }, );
-	my $prev = $stage->insert( VBox => name => "preview", pack => { fill => 'both' }, );
-	$stage->insert(Label => text => " ", pack => { fill => 'both', expand => 1, }, );
-	my ($hb,$hbi) = labeledRow($stage,"Title: ",( name => 'tbox', contents => [ ["InputLine", text => "Change Me; I'm used for indexing", width => 300, pack => { alignment => ta::Left, fill => 'x', },],], boxfill => 'x', boxex => 0, labfill => 'x', labex => 1, ));
-	my ($tb,$tbi) = labeledRow($stage,"Content: ",( contents => [[InputLine => text => "This is a wonderful place to put the final description text.", pack => { fill => 'both' }, width => 400,]], boxfill => 'x', boxex => 0, labfill => 'x', labex => 1,));
-	my $detbox = $stage->insert( HBox => name => "me" );
-	my $calent = $detbox->insert( InputLine => text => '0000-00-00', name => 'imadate' );
-	my $calbut = PGK::insertCalButton($detbox,$calent,'calent',"Choose Date");
-	my $timent = $detbox->insert( InputLine => text => "0800", hint => "Time to publish post" );
-	my $catent = $detbox->insert( InputLine => name => "category", hint => "Post category" );
-	my %tunnel;
-	my $sbut = $detbox->insert( Button => text => "Schedule", onClick => sub { carpWithout($tunnel{image},"schedule a post","choose a post image") or schedulePost($_[0],$prev,\%tunnel); } );
-	$tunnel{calent} = $calent;
-	$tunnel{timent} = $timent;
-	$tunnel{catent} = $catent;
-	$tunnel{titlent} = $hbi;
-	$tunnel{desced} = $tbi;
-	$prev->{tunnel} = \%tunnel;
-	my $notebox = $panes->insert( Edit => name => "notes", pack => { fill => 'both', expand => 1 }, hint => "This is a good place to store notes about your schedule.", ); # a box for writing notes
-	$notebox->{lines} = $$gui{notes}; # allows the object to save its lines over the lines I'm about to load from the array stored therein
-	$notebox->text(join('
-',@{$$gui{notes}}) ); # Allows us to load the lines from the text file into the editor
-	refreshDescList($lister,$prev,$tar,$sched);
-# Show these: fields for each dated.txt field, calendar for scheduling, time fields, schedule button
-# will this tab be used for both individual schedule items and for weekly schedules? Do I need another tab?
-	my @images = loadDatedDays($$gui{status},1);
-	my $op = $schpage->insert( Button => text => "Weekly Schedule", onClick => sub { devHelp($gui,"Setting a weekly schedule"); }, pack => { fill => 'x', expand => 0, }, );
-	my $mb = $schpage->insert( Button => text => "Monthly Schedule", onClick => sub { showMonthly($gui,$bgcol,\@images) }, pack => { fill => 'x', expand => 0, }, );
-	my $rcb = $schpage->insert( Button => text => "Recurring Item Library", onClick => sub { showRecurLib($schpage,$bgcol,\@images, (FIO::config('Disk','rotatedir') or "lib")); }, pack => { fill => 'x', expand => 0, }, );
-# This page will be for scheduling specific images with specific dates
-# buttons to load dsc files
-# a pane for dsc files to load into
-# when a button from a dsc file is clicked, it goes into a new pane,
-#	a date widget sets the date
-# This is a special date widget that allows selecting a day of the week, instead.
-# a box shows the item's description, with the date applied into its description, if it contains placeholders
-# box allows editing of description
-# image preview for item
-# another pane shows files affected by the date selected, along with the items those files already contain.
-# a group of buttons to ***Write the Item into Dated File in Schedule Directory** "Save to <date>.txt" "Save to <weekday>.txt" "Save to [1st2nd3rd4th] Weekday"
-
-}
-print ".";
-
-=item resetPublishing TARGET
-
-Given a TARGET widget, generates the list widgets needed to perform the Publishing page's functions.
-Returns 0 on completion.
-Dies on error opening library directory.
-
-=cut
-
-sub resetPublishing {
-	my ($args) = @_;
-	my $pubpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
-	Sui::storeData('context',"Publishing");
-	my $bgcol = $$args[1];
-	Sui::storeData('background',PGK::convertColor($bgcol));
-	my $gui = getGUI();
-	$pubpage->empty(); # start with a blank slate
-	my $box = $pubpage->insert( VBox => name => "pubpage", backColor =>  PGK::convertColor($bgcol) + 32 );
-	my $ofile = labelBox($box,"Output RSS: ",'fileout','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
-	$ofile->set(backColor => PGK::convertColor($bgcol)); # output filename
-	my $ofn = $ofile->insert( InputLine => text => "rssnew.xml");
-	my $ifile = labelBox($box,"Existing RSS",'filein','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0); # RSS template filename
-	$ifile->set(backColor => PGK::convertColor($bgcol));
-	my $ifn = $ifile->insert( InputLine => text => (FIO::config('Disk','template') or "rss.xml"));
-	my $datebox = $box->insert( HBox => name => "dates", backColor =>  PGK::convertColor($bgcol) + 16 );
-	my $datefrom = PGK::insertDateWidget($datebox,undef,{ label => "From ", bgcol => $bgcol, }); # start date
-	my $dateto = PGK::insertDateWidget($datebox,undef,{label => " to ", bgcol => $bgcol, }); # end date
-	my $nextbox = labelBox($box,"Next ID",'nextid','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
-	$nextbox->set(backColor => PGK::convertColor($bgcol));
-	my $nextid = $nextbox->insert( SpinEdit => name => 'nextid', max => 9999999, min => 0, step => 20, value => (FIO::config('Main','nextid') or 1)); # a spinner for the next ID
-	my ($pbut,$notebox);
-	$pbut = $box->insert( Button => text => "Prepare...", onClick => sub { toRSSfromGUI($pubpage,$ifn,$ofn,$datefrom,$dateto,$nextid,$box,$notebox,$bgcol); }, );
-	$notebox = $pubpage->insert( Edit => name => "notes", pack => { fill => 'both', expand => 1 }, hint => "This is a good place to store notes about your schedule.", ); # a box for writing notes
-	$notebox->{lines} = $$gui{notes}; # allows the object to save its lines over the lines I'm about to load from the array stored therein
-	$notebox->text(join('
-',@{$$gui{notes}}) ); # Allows us to load the lines from the text file into the editor
-}
-print ".";
-
-sub saveSequence {
-	my @lines = ();
-	my $fn = shift;
-	my $stat = getGUI('status');
-	$stat->push("Writing sequence...");
-	foreach my $i (@_) {
-		next unless (ref $i eq "RItem"); # make sure we only use RItems.
-		unless (defined $i->link && defined $i->title && defined $i->text) {
-			my $es = "Subject RItem  passed to saveSequence does not contain all required data " . Common::lineNo(2);
-			print "$es\n";
-			$stat->push($es);
-			next;
-		}
-		print "\n " . $i->link() . ": " . $i->text() . " @" . $i->time() . " (" . $i->cat() . ")";
-		push(@lines,"image=" . $i->link . ">title=" . $i->title . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">");
-	}
-	my $odir = (FIO::config('Disk','rotatedir') or "lib");
-	$fn =~ s/\..+$//; # remove any existing extension
-	$fn = "$odir/$fn.seq";
-	$stat->push("Saving sequence to $fn...");
-	return FIO::writeLines($fn,\@lines,0);
-	$stat->push("Sequence saved.");
-}
-print ".";
-
 sub loadSequence { # to load .seq files into this GUI.
 	devHelp("Loading sequence files");
-}
-print ".";
-
-sub saveDatedSequence {
-	my @lines = ();
-	use DateTime;
-	use DateTime::Format::DateParse;
-	my $stat = getGUI('status');
-	my $datestr = shift;
-	if ($datestr eq "0000-00-00") {
-		carpWithout(undef,"save a dated sequence","choose a date");
-		return -1;
-	}
-	my $date = DateTime::Format::DateParse->parse_datetime( $datestr );
-	my $end = shift;
-	my $l = 0;
-	$stat->push("Running dates from " . $date->ymd() . " for $end days.");
-	my $seq = shift;
-	unless (scalar @$seq) {
-		carpWithout(undef,"save a dated sequence","generate a sequence");
-		$stat->push("Failed to write sequence: No sequence to write!");
-		return -2;
-	}
-	foreach my $i (@$seq) {
-		next if ($l++ > $end);
-#		print "$l,";
-		next unless (ref $i eq "RItem"); # make sure we only use RItems.
-		unless (defined $i->link && defined $i->title && defined $i->text) {
-			my $es = "Subject RItem passed to saveDatedSequence does not contain all required data " . Common::lineNo(2);
-			print "$es\n";
-			$stat->push($es);
-			next;
-		}
-#		print "\ndate=" . $date->ymd() . ">image=" . $i->link . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">";
-		push(@lines,"date=" . $date->ymd() . ">image=" . $i->link . ">title=" . $i->title . ">desc=" . $i->text . ">time=" . $i->time . ">cat=" . $i->cat . ">");
-		$date += DateTime::Duration->new( days=> 1 );
-	}
-	my $fn = "schedule/dated.txt";
-	$stat->push("Saving sequence to $fn...");
-	my $e = FIO::writeLines($fn,\@lines,0);
-	$stat->push("Sequence saved.");
-	return $e;
 }
 print ".";
 
@@ -854,6 +141,7 @@ sub loadDatedDays {
 	my ($stat,$clobber,$wildcard) = @_;
 	my %scheduled = ();
 	my %regular = ();
+	#TODO: Make a function to streamline these two very similar processes.
 	# load lines from dated.txt
 	my @lines = FIO::readFile("schedule/dated.txt",$stat,0);
 	foreach my $line (@lines) {
@@ -907,7 +195,9 @@ print ".";
 
 sub generateSequence {
 	my ($group,$container,$aref) = @_;
-	my @rows = $container->widgets();
+	#FIXME: unblessed reference here sometimes?
+	#TODO: Have this change the text of each button to its sequence value
+	my @rows = $$container->widgets();
 	foreach my $r (@rows) {
 		next unless (ref $r eq "HBox"); # rows should be HBoxes
 		my @buttons = $r->widgets();
@@ -1129,76 +419,6 @@ sub carpWithout {
 	return 1;
 }
 
-=item resetOrdering TARGET
-
-Given a TARGET widget, generates the list widgets needed to perform the Ordering page's functions.
-Returns 0 on completion.
-Dies on error opening library directory.
-
-=cut
-
-sub resetOrdering {
-	my ($args) = @_;
-	my $sequence = [];
-	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
-	Sui::storeData('context',"Ordering");
-	my $bgcol = $$args[1];
-	$ordpage->empty(); # start with a blank slate
-	my $odir = (FIO::config('Disk','rotatedir') or "lib");
-	opendir(DIR,$odir) or die $!;
-	my @files = grep {
-		/\.grp$/ # only show rotational image group files.
-		&& -f "$odir/$_"
-		} readdir(DIR);
-	closedir(DIR);
-	$ordpage->insert( Label => text => "Ordering", pack => { fill => 'x', expand => 0}, );
-	my $lister = $ordpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1}, backColor => PGK::convertColor($bgcol),  );
-	$lister->insert( Label => text => "Choose a group file:");
-	my ($selector,$rows,$gtype,$randbut,$timee,$cate);
-	my $colors = FIO::config('UI','gradient');
-	my $bgcol2 = Common::getColors(5,1,1);
-	my $op2 = $ordpage->insert( HBox => name => "Color List");
-	my $sides = $ordpage->insert( HBox => name => "panes", pack => { fill => 'both', anchor => 'w', expand => 0, }, );
-	my $lpane = $sides->insert( HBox => name => "Input", pack => {fill => 'y', expand => 0, anchor => "w", }, alignment => ta::Left, backColor => PGK::convertColor($bgcol),  );
-	my $rpane = $sides->insert( VBox => name => "Output", pack => {fill => 'both', expand => 1, anchor => "nw", }, backColor => PGK::convertColor($bgcol2), );
-	foreach my $f (@files) {
-		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-			$rows = tryLoadGroup($rpane,$f,\$selector,$colors,$sequence,(gtype => $gtype,rbut => $randbut, time => $timee, cat => $cate,));
-		});
-	}
-	$gtype = $lpane->insert( XButtons => name => "group type"); # an XButton set to select ordering
-	my $llpane = $lpane->insert( VBox => name => "leftish pane" );
-# Group will have:
-	$gtype->arrange("top"); # vertical
-	 my @types = (0,"none",1,"striped",2,"grouped",3,"mixed",4,"sequenced"); # defining the buttons
-	 my $def = 1; # selecting default
-	 $gtype->build("Group Type:",$def,@types); # show me the buttons
-	$gtype->onChange( sub { carpWithout($rows,"set order type","choose a group"); } ); # change the group's order type.
-	$randbut = $llpane->insert( Button => text => "Produce Order", onClick => sub { carpWithout($rows,"produce a sequence","choose a group") }, pack => { fill => 'x' }, ); # a randomize button to generate a new sequence.
-	$cate = makeCatButtonSet($llpane,\$rows);
-	$timee = makeTimeButtonSet($llpane,\$rows);
-
-	my $savings = $llpane->insert( HBox => name => "savers" );
-	my $saveas;
-	my $saver = $savings->insert( Button => text => "Save as...", onClick => sub { carpWithout($rows,"save a sequence","choose a group") or saveSequence($saveas->text(),$sequence); }, ); # a button to save group into a group file.
-	$saveas = $savings->insert( InputLine => name => 'seq', text => 'my.seq', ); # an InputLine to hold the sequencing.
-	my $savecal = $llpane->insert( VBox => name => "box" );
-	my $calent = PGK::insertDateWidget($savecal,undef,{ label => "Start on:", }, ); # a date widget to show the starting date of the ordering (used for sequenced groups)
-	my $sl = $savecal->insert( Label => text => "Length of Sequence");
-	my $seqlen = $savecal->insert( SpinEdit => name => 'size', max => 365, min => 1, step => 5, value => 10, width => 50);
-	my $savedate = $savecal->insert( Button => text => "Save to dated.txt", onClick => sub { carpWithout($rows,"save a sequence","choose a group") or saveDatedSequence($calent->text,$seqlen->value,$sequence); }, );
-	$op2->insert( Label => text => "Gradient Order:" );
-	my @colora = split(",",$colors);
-	foreach my $i (0..$#colora) {
-		next if ($i > 24);
-		$op2->insert( Button => text => "", width => 9, height => 9, backColor => PGK::convertColor($colora[$i % ($#colora + 1)]));
-	}
-	my $gui = getGUI();
-	my @images = loadDatedDays($$gui{status},1);
-	my $rcb = $llpane->insert( Button => text => "Recurring Item Library", onClick => sub { showRecurLib($ordpage,$bgcol,\@images,$odir); }, pack => { fill => 'x', expand => 0, }, );
-}
-print ".";
-
 sub makeCatButtonSet {
 	my ($llpane,$rows,%extra) = @_;
 	my $cateb = labelBox($llpane,"Category: ",'category','V', boxfill => 'x', boxex => 0, labfill => 'x', labex => 1);
@@ -1265,194 +485,6 @@ sub itemIntoRow {
 	$ti->{cat} = $extra->{cat} if (defined $extra->{cat});
 	$ti->{time} = $extra->timestamp() if (ref $extra eq "RItem");
 	PGK::killButton($ti, sub { $ti->destroy(); }); #delete row from page
-}
-print ".";
-
-sub slurpPane {
-	my ($prev,$target,$rows,$index,$items) = @_;
-	return unless (ref $prev eq "VBox");
-	my @rows = $prev->get_widgets(); # prev is expected to be a VBox. Grab its children.
-	foreach my $r (@rows) {
-		print "The name is " . $r->name() . "..."; # the row's name will match the item's name...
-		my $item;
-		foreach my $it (@$items) {
-			if ($it->name() eq $r->name()) {
-				$item = $it;
-				last;
-			}
-		}
-		my @box = $r->get_widgets(); # each row should be an HBox containing a Label and a Button.
-		defined $item and print "Seeking " . $box[0]->text() . " => " . $item->link() . "...\n"; # the row's label's text should match the item's text.
-		defined $item and itemIntoRow($rows,$index,$item->name,$item->link,$box[0]->text());
-	}
-	$prev->empty();
-}
-print ".";
-
-sub slurpButton {
-	my ($target,$starget,$rows,$index,$items,$sz,$fill,$expand) = @_;
-	$sz = ($sz ? $sz : 24);
-	$fill = ($fill ? $fill : 'none');
-	$expand = ($expand ? $expand : 0);
-	return $target->insert( Button => text => ">>>", onClick => sub { return slurpPane($starget,$target,$rows,$index,$items); }, pack => { fill => $fill, expand => $expand, }, width => $sz, height => $sz );
-}
-print ".";
-
-sub trySaveGroup {
-	my ($target,$rows,$fnwidget,$args) = @_;
-	my @lines;
-	push(@lines,"next=-1,-1");
-	my $fn = $fnwidget->text();
-	$target->insert( Label => text => "Preparing to save file...");
-	infMes("I'll be saving group info into '$fn'",1);
-	my $i = 0;
-	foreach my $r (@$rows) {
-		print "Row $i: ";
-		foreach my $c ($r->widgets()) {
-			for (ref $c) {
-				if (/InputLine/) { print $c->text() . "\n";
-					push(@lines,"row=" . $c->text());
-				}elsif (/HBox/) {
-					unless (defined $c->{inm}) {
-						print "\n [W] Skipping box with missing item number: $c\n";
-						next
-					} else {
-						push(@lines,"item=" . $c->{inm}) if (defined $c->{inm});
-						push(@lines,"image=" . $c->{link}) if (defined $c->{link});
-						push(@lines,"desc=" . $c->{desc}) if (defined $c->{desc});
-						push(@lines,"cat=" . $c->{cat}) if (defined $c->{cat});
-						push(@lines,"time=" . $c->{time}) if (defined $c->{time});
-						$c->destroy();
-					}
-				} else {
-					$c->destroy();
-				}
-			}
-		}
-		$r->destroy();
-		Pfresh();
-		$i++;
-	}
-	print $target->name();
-	$target->empty();
-	$target->insert( Label => text => "Saving your file as\n$fn...", autoHeight => 1 );
-	Pfresh(); # redraw UI
-	my $error = FIO::writeLines($fn,\@lines,1); # overwrites file!
-	$target->insert( Label => text => "Save complete.\nWrote " . scalar @lines . " lines.", autoHeight => 1);
-	$target->insert( Button => text => "Load/Create\nAnother", onClick => sub { $target->empty(); insertGroupLoaders($target,$$args{prev},$$args{tar},$rows,$$args{bgcol},$$args{buth}); });
-	$target->insert( Button => text => "Continue to\nOrdering tab", onClick => sub { getGUI('pager')->switchToPanel("Ordering"); } );
-	return $error;
-}
-print ".";
-
-=item tryLoadGrouper TARGET FILE LISTPANE HASHREF HASHREF
-
-Given a reset TARGET widget, a FILE name, a HASHREF of storable values, and a HASHREF in which to store data, loads the rows from a file and displays them for output addition
-
-=cut
-#$rpane,$f,$preview,$tar,$rows);
-sub tryLoadGrouper {
-	my ($target,$fn,$prev,$items,$rows,$args) = @_;
-	my $orderkey = 0; # keep URLs in order
-	my $odir = (FIO::config('Disk','rotatedir') or "lib");
-	$fn = "$odir/$fn";
-	if (-e $fn) { # existing file
-		return 1 unless (-f $fn && -r _); # stop process if not a valid filename for a readable file.
-	} else { # new file?
-		(-r $fn) and print "File $fn created!\n";
-	}
-	my $stat = getGUI('status');
-	$stat->push("Trying to read $fn...");
-	my $size = -s $fn;
-	my $create = (defined $$args{create} ? $$args{create} : 0);
-	my @them = FIO::readFile($fn,$stat,$create);
-	if ($#them == 0) {
-		$stat->push("Zero lines found in file!");
-	} elsif ($#them == 1) {
-		$stat->push("One line found in file!");
-	}
-	$stat->push("Processing " . scalar @them . " lines...");
-	my ($rowname,$nextpair,$desc,$link,$itemname,$rbox);
-	my $count =0;
-	my $foundrow = 0;
-# rowbox (( rownameinput rowkillbutton items [[ VBoxes moved over from preview? ]] ))
-
-	$fn =~ s/\..+$//; # remove any existing extension
-	my $filebox = $target->insert( InputLine => text => "$fn.grp" );
-	my $saver = $target->insert( Button => text => "Save");
-	my $adder = $target->insert( Button => text => "Add Row", onClick => sub {
-		my $row = $target->insert( VBox => name => "rownew", backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
-		$row->insert( InputLine => text => "Unnamed Row ($foundrow)", );
-		my $kill = $foundrow; # maintain scope for kill button
-		slurpButton($row,$prev,$rows,$kill,$items,undef,'x');
-		PGK::killButton($row, sub { splice(@$rows,$kill,1); $row->destroy(); },undef,'x'); #delete row from page and from array
-		push(@$rows,$row);
-		$foundrow++;
-	} );
-	foreach my $line (@them) {
-		chomp $line;
-		$line =~ m/(.*?\=)?(.*)/; # find keywords
-		my $k = (defined $1 ? substr($1,0,-1) : "---"); # remove the equals sign from the keyword, or mark the line as a continued text line
-		$k =~ s/\s//g; # no whitespace in keywords, please
-		return -1 if ($k eq "" || $2 eq ""); # if we couldn't parse this, we won't try to build a row, or even continue.
-		my $descact = 0;
-		if ($k eq "desc") { # for each keyword, store data in hash
-			unless ($foundrow) {
-				$stat->push("Malformed file $fn gives an item description outside of a row! Aborting.");
-				return -1;
-			}
-			$descact = 1;
-			$desc = $2;
-		} elsif ($descact && $k eq "---") { # this is another line of text
-			unless ($foundrow) {
-				$stat->push("Malformed file $fn gives an item description outside of a row! Aborting.");
-				return -1;
-			}
-			$desc = $desc . "\n$2";
-		} elsif ($k eq "image") { # the link/image that goes with the post
-			unless ($foundrow) {
-				$stat->push("Malformed file $fn gives a link outside of a row! Aborting.");
-				return -2;
-			}
-			$link = $2;
-			$descact = 0;
-		} elsif ($k eq "row") { # should start the row record.
-			itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
-			($link,$desc,$itemname) = (undef,undef,undef); # clear values so I can check for definition
-			my $row = $target->insert( VBox => name => "row$foundrow", backColor => PGK::convertColor(Common::getColors(($foundrow % 2 ? 5 : 6),1)), );
-			$row->insert( InputLine => text => $2 );
-			my $kill = $foundrow; # maintain scope for kill button
-			slurpButton($row,$prev,$rows,$kill,$items,undef,'x');
-			PGK::killButton($row, sub { splice(@$rows,$kill,1); $row->destroy(); },undef,'x'); #delete row from page and from array
-			$foundrow++;
-			push(@$rows,$row);
-		} elsif ($k eq "item") { # should start the item record.
-			unless ($foundrow) {
-				$stat->push("Malformed file $fn gives an item outside of a row! Aborting.");
-				return -3;
-			}
-			itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
-			($link,$desc,$itemname) = (undef,undef,undef); # clear values so I can check for definition
-			(defined $$args{debug}) and print ":";
-			$count++;
-			$descact = 0;
-			$itemname = $2;
-		} elsif ("$k" eq "next") {
-			; # probably the end of the file. Do nothing.
-		} else { # Oops! Error.
-			warn "\n[W] I found unexpected keyword $k with value $2 in $fn" . Common::lineNo();
-		}
-#defined $$args{debug} and print "\n $k = $2...";
-	}
-	itemIntoRow($rows,$foundrow -1,$itemname,$link,$desc) if (defined $link && defined $desc && defined $itemname);
-	$prev->empty();
-	$fn =~ s/\..+$//; # remove any extension
-	$$args{prev} = $prev;
-	$$args{tar} = $items;
-	$saver->set( onClick => sub { $adder->destroy(); $saver->destroy(); $filebox->hide(); trySaveGroup($target,$rows,$filebox,$args) } );
-	$stat->push("Done loading $count items.");
-	return 0; # success!
-
 }
 print ".";
 
@@ -1731,121 +763,6 @@ sub makeDescButton {
 }
 print ".";
 
-=item resetGrouping TARGET
-
-Given a TARGET widget, generates the list widgets needed to perform the Grouping page's functions.
-Returns 0 on completion.
-Dies on error opening library directory.
-
-=cut
-
-sub resetGrouping {
-	my ($args) = @_;
-	my $ordpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
-	Sui::storeData('context',"Grouping");
-	my $bgcol = $$args[1];
-	$ordpage->empty(); # start with a blank slate
-	my $odir = (FIO::config('Disk','rotatedir') or "lib");
-	my @files = FIO::dir2arr($odir);
-	my $tar = []; # Target Array Reference
-	my $rows = [];
-	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
-	$ordpage->insert( Label => text => "Grouping", pack => { fill => 'x', expand => 0}, );
-	my $paner = $ordpage->insert( HBox => name => "panes", pack => {fill => 'both', expand => 1} );
-	my $lpane = $paner->insert( VBox => name => "Input", pack => {fill => 'y', expand => 0} );
-	my $lister = $lpane->insert( VBox => name => "InputList", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor("#66FF99") );
-	my $preview = $paner->insert( VBox => name => "preview", pack => {fill => 'both', expand => 1, ipad => 3, anchor => 'n', side => 'top'} );
-	$preview->backColor(PGK::convertColor("#99FF99"));
-	my $rpane = $paner->insert( VBox => name => "Output", pack => {fill => 'y', expand => 0} , backColor => PGK::convertColor("#ccFF99") );
-	$lister->insert( Label => text => "Choose a description file:");
-	foreach my $f (@files) {
-		if ($f =~ /\.dsc/) { # description files
-			makeDescButton($lister,$f,$lpane,$preview,$tar);
-		}
-	}
-	my $error = insertGroupLoaders($rpane,$preview,$tar,$rows,$bgcol,$buttonheight);
-}
-print ".";
-
-sub insertGroupLoaders { # we'll be doing this (placing buttons for loading/creating a GRP file) from two places.
-	my ($rpane,$preview,$tar,$rows,$bgcol,$buttonheight) = @_;
-	my $error = 0;
-	my $grouper = $rpane->insert( VBox => name => "grouper", pack => {fill => 'both', expand => 1, ipad => 3}, backColor => PGK::convertColor($bgcol), );
-	my $rowbox;
-	$grouper->insert( Label => text => "Choose a group file:");
-	my $newfile = $grouper->insert( HBox => name => "newbox", backColor => PGK::convertColor($bgcol), );
-	my $newil = $newfile->insert( InputLine => text => "unnamed" );
-	my $stat = getGUI("status");
-	$newfile->insert( Button => text => "Create", onClick => sub {
-				my $f = $newil->text;
-				$grouper->destroy();
-				$f =~ s/\..+$//; # remove any existing extension
-				$f = "$f.grp"; # add GRP extension
-				$error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows,{bgcol => $bgcol,create => 1,buth => $buttonheight,});
-				$error and $stat->push("An error occurred loading $f!"); });
-	$error and return $error;
-	my $odir = (FIO::config('Disk','rotatedir') or "lib");
-	my @files = FIO::dir2arr($odir);
-	foreach my $f (@files) {
-		if ($f =~ /\.grp/) { # rotating image groups
-			$grouper->insert( Button => text => $f, onClick => sub { $grouper->destroy();
-				$error = tryLoadGrouper($rpane,$f,$preview,$tar,$rows,{bgcol => $bgcol, buth => $buttonheight,});
-				$error and $stat->push("An error occurred loading $f!"); }, height => $buttonheight, );
-		}
-	}
-	return $error;
-}
-print ".";
-
-sub placeDescLine {
-	my ($page,$stat,$hitserver,$line,$hashr,$orderkey,$viewsize,$buttonheight,$vp,$cap,$ib,$collapsed,$expanded,$moment,$pageitem,$pagenumber,$dtxt,$title) = @_;
-	my ($error,$server,$img,$lfp) = fetchapic($line,$hitserver,$stat,$page);
-	return $error if $error;
-	$page->set( height => $viewsize + 7 );
-	my $row = $page->insert( HBox => name => $img);
-	$$orderkey++; # new order key for each image found.
-	my $okey = sprintf("%04d",$$orderkey);# Friendly name, in string format for use as hash key for keeping image order
-	$$hashr{$okey} = {}; # make a new empty hash for each image
-	$$hashr{$okey}{url} = $line; # Store image url for matching with a description later
-	if (-r $lfp . $img ) {
-# put both of these in a row object, along with the inputline for the description
-		$row->insert( Label => name => "$img", text => "Description for ");
-# replace this with an Image object, so we can set the zom factor and resize the image when the user clicks on it to see it so they can describe it.
-		my ($pic,$iz) = showapic($lfp,$img,$viewsize);
-		my $lfn = "$lfp$img";
-		my $shower = $row->insert( Button => name => "$lfn", text => "$img", height => $buttonheight, ); # button for filename
-		$shower->set( onClick => sub {
-			defined $$vp and $$vp->destroy;
-			$cap->text($shower->text);
-			$$vp = $ib->insert( ImageViewer =>
-				name => "i$img", zoom => $iz, width => $viewsize, height => $viewsize,
-				pack => {fill => 'none'}, image => $pic); $::application->yield(); });
-# put description inputline here.
-	} else {
-		$row->insert( Label => text => "$img could not be loaded for viewing." );
-	}
-	my $nt = $row->insert( InputLine => width => 50, name => "t of $line", text => (defined $title ? "$title" : "$okey") );
-	$nt->set(onLeave => sub { $$hashr{$okey}{title} = $nt->text; });
-	$row->insert( Label => text => ":");
-	my $desc = $row->insert( InputLine => width => 350, name => "$line", text => (defined $dtxt ? $dtxt : "") );
-	$desc->set(onLeave => sub { $$hashr{$okey}{desc} = $desc->text; });
-#	$row->insert( Button => name => 'dummy', text => "Set"); # Clicking button triggers hash store, not by what the button does but by causing the input to lose focus.
-#	$row->height($collapsed);
-	if ($$hitserver) {
-		$stat->push("Waiting...");
-		Pwait($moment,$stat,"Waiting...");
-		$$hitserver = 0;
-	}
-	$$pageitem++;
-#	if ($$pageitem > $groupsof) { # This will only proc if we have more than 10 items, anyway.
-#		$$pageitem -= $groupsof;
-#		$$pagenumber++;
-#		$page = $book[$$pagenumber];
-#	}
-	Pfresh();
-}
-print ".";
-
 sub fetchapic { # fetches an image from the cache, or from the server if it's not there.
 	my ($line,$hitserver,$stat,$target) = @_;
 	unless ($line) {
@@ -1903,149 +820,6 @@ sub showapic {
 }
 print ".";
 
-sub pagifyGroup {
-	my ($target,$count,$pageof,$scale,$obtype,%args) = @_;
-	my (@book,@pagelist); # array for the pages
-	use POSIX qw( floor ); # to get the int value
-	my $pages = floor($count / $pageof); # Divide and discard remainder
-	return ($target,@book) unless ($pages); # if not enough for paging, just use the target.
-	foreach my $i (0..$pages) {
-		push(@pagelist,"page$i");
-	}
-	my $newtarget = $target->insert( Pager => name => "pager", pack => { fill => 'both', expand => 1, }, minHeight => $scale, minWidth => 200, );
-	$newtarget->control("buttons");
-	$newtarget->build(@pagelist);
-	foreach my $i (0..$pages) {
-		my $child = $newtarget->insert_to_page($i,$obtype => name => "page$i", %args);
-		push(@book,$child);
-	}
-	return ($newtarget,@book);
-}
-print ".";
-
-=item tryLoadInput TARGET FILE PAUSEOBJ HASH SIZEOBJ
-
-Given a reset TARGET widget, a FILE name, a PAUSEOBJect containing a delay in the text field, a HASH in which to store 
-
-=cut
-
-sub tryLoadInput {
-	my ($resettarget,$fn,$pausebox,$hashr,$viewsize) = @_;
-	my $collapsed = 24;
-	my $expanded = 800;
-	my $moment = $pausebox->value;
-	my $hitserver = 0;
-	my $orderkey = 0; # keep URLs in order
-	$viewsize = $viewsize->value; # object to int
-	$resettarget->empty(); # clear page.
-	Pfresh(); # redraw UI
-	$resettarget->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, );
-	return 0 unless ($fn eq "NONE" || Common::findIn($fn,@openfiles) < 0); # don't try to load if already loaded that file.
-	return 0 unless ($fn eq "NONE" || -e $fn && -f _ && -r _); # stop process if contents of text input are not a valid filename for a readable file.
-	my $stat = getGUI('status');
-	my @them;
-	my $buttonheight = (FIO::config('UI','buttonheight') or 18);
-	unless ($fn eq "NONE") { # trying to load a real file
-		$stat->push("Trying to load $fn...");
-		@them = FIO::readFile($fn,$stat);
-		if ($#them == 0) {
-			$stat->push("Zero lines found in file!");
-		} elsif ($#them == 1) {
-			$stat->push("One line found in file!");
-		}
-	}
-	my $parms = [$stat,\$hitserver,$hashr,\$orderkey,$buttonheight,$collapsed,$expanded,$moment];
-	sub outboxMaker {
-		my ($rt,$filen,$vs,$list,$args) = @_;
-		my ($sb,$hitsr,$hr,$okeyr,$buthi,$coll,$exp,$mom) = @{$args};
-		$hr = {};
-		my $moreitems = 0;
-		my @them = @{$list};
-		my $outbox = labelBox($rt,"Images",'imagebox','V', boxfill => 'both', boxex => 0, labfill => 'none', labex => 0);
-		my $hb = $outbox->insert( HBox => name => "$filen", pack => {fill => 'x', expand => 1} ); # Left/right panes
-		my $ib = $hb->insert( VBox => name => "Image Port", pack => {fill => 'y', expand => 1, padx => 3, pady => 3,}, width => $vs + 10 ); # Top/bottom pane in left pane
-		my $vp; # = $ib->insert( ImageViewer => name => "i$img", zoom => $iz, pack => {fill => 'none', expand => 1, padx => 1, pady => 1,} ); # Image display box
-		my $cap = $ib->insert( Label => text => "(Nothing Showing)\nTo load an image, click its button in the list.", autoHeight => 1, pack => {fill => 'x', expand => 0, padx => 1, pady => 1,} ); # caption label
-		my $lbox = $hb->insert( VBox => name => "Images", pack => {fill => 'both', expand => 1, padx => 0, pady => 0, minHeight => $vs + 75, } ); # box for image rows
-		my $groupsof = (FIO::config('UI','buttonrowmax') or 10);
-#	my ($pager,@book) = pagifyGroup($lbox,scalar @them,$groupsof,$viewsize,"VBox");
-		my $page = $lbox;
-		if (scalar @them > $groupsof) {
-			$moreitems = int((scalar @them) / $groupsof);
-print "More: $moreitems (${groupsof}::" . scalar @them . ")\n";
-#		$page = $book[0];
-		} else {
-			$groupsof = scalar @them; # make groups of total size if smaller, for use in loops.
-		}
-		my $pagenumber = 0;
-		my $pageitem = 0;
-		unless ($filen eq "NONE") { # real file...
-			foreach my $ln (0 .. $groupsof) {
-				my $line = shift @them;
-				placeDescLine($page,$sb,$hitsr,$line,$hr,$okeyr,$vs,$buthi,\$vp,$cap,$ib,$coll,$exp,$mom,\$pageitem,\$pagenumber);
-			}
-		} else { # manual entry
-			$outbox->insert( Button => text => "Add an image", onClick => sub {
-				my %ans = PGK::askbox($outbox,"Enter Image Details",{},"url","URL:","title","Title:","desc","Description:");
-				return -1 unless (exists $ans{url} and $ans{url} ne '');
-				placeDescLine($page,$sb,$hitsr,$ans{url},$hr,$okeyr,$vs,$buthi,\$vp,$cap,$ib,$coll,$exp,$mom,\$pageitem,\$pagenumber,$ans{desc},$ans{title});
-			} );
-		}
-		$moreitems and $outbox->insert( Button => text => "Skip this $groupsof items", pack => { fille => 'x', expand => 0, }, onClick => sub {
-			$outbox->destroy();
-			$sb->push("Skipping this screen of items.");
-			outboxMaker($rt,$filen,$vs,\@them,$args);
-		}, );
-		my $of = $outbox->insert( InputLine => text => ($filen eq "NONE" ? "manual.dsc" : "prayers.dsc"), pack => { fill => 'x', expand => 0, },);
-		$outbox->insert( Button => text => "Save", pack => { fill => 'x', expand => 0, }, onClick => sub {
-			my $ofn = $of->text;
-			$ofn =~ s/\..+$//;
-			$ofn = "$ofn.dsc";
-			$outbox->destroy();
-			saveDescs($ofn,$hr,0);
-			$sb->push("Descriptions written to $ofn.");
-			my $cont = $rt->insert( VBox => name => "continuations", pack => {fill => 'both', expand => 1} );
-			$cont->insert( Label => text => "Your file has been saved.", pack => {fill => 'both', expand => 1});
-			if ($moreitems) {
-				$cont->insert( Label => text => "More items were found in this file." );
-				$cont->insert( Button => text => "Load page next $groupsof lines", onClick => sub { $cont->destroy(); outboxMaker($rt,$filen,$vs,\@them,$args); }, );
-			}
-			$cont->insert( Button => text => "Continue to Grouping tab", onClick => sub { getGUI('pager')->switchToPanel("Grouping"); } );
-			$cont->insert( Button => text => "Continue to Scheduling tab", onClick => sub { getGUI('pager')->switchToPanel("Scheduling");} );
-			$cont->insert( Label => text => scalar %$hr . " images.", pack => {fill => 'both', expand => 1});
-		});
-	}
-	outboxMaker($resettarget,$fn,$viewsize,\@them,$parms);
-	$stat->push("Done.");
-	return 0; # success!
-}
-print ".";
-
-=item saveDescs FILE HASH [OVERWRITE]
-
-Given a FILEname and a HASHref to a list of descriptions, converts the list into a format suitable for the group files the Ordering page will read. Optionally you can add a marker to blank the file before writing to it (OVERWRITE).
-
-=cut
-
-sub saveDescs {
-	my ($fn,$hr,$overwrite) = @_;
-	my $n = length keys %$hr;
-	my @lines = ();
-	my $verbose = FIO::config('Debug','v');
-	$verbose and infMes("Saving $n descriptions to $fn... ",1);
-	foreach my $ok (sort keys %$hr) {
-		next if (missing($$hr{$ok}{url}) || missing($$hr{$ok}{desc}) || missing($$hr{$ok}{title}));
-		print "$ok, ";
-		push(@lines,"item=$$hr{$ok}{title}");
-		push(@lines,"url=$$hr{$ok}{url}");
-		push(@lines,"desc=$$hr{$ok}{desc}");
-	}
-	my $lib = (FIO::config("Disk",'rotatedir') or "lib");
-	FIO::writeLines("$lib/$fn",\@lines,$overwrite);
-	return 0;
-}
-print ".";
-
 =item resetDescribing TARGET
 
 Given a TARGET widget, generates the input boxes and list widgets needed to perform the Describing page's functions.
@@ -2054,38 +828,62 @@ Dies on error opening given directory.
 
 =cut
 
+require PGUIdesc;
 sub resetDescribing {
-	my ($args) = @_;
-	my $imgpage = $$args[0]; # unpack from dispatcher sending ARRAYREF
-	Sui::storeData('context',"Describing");
-	my $bgcol = $$args[1];
-	$imgpage->empty(); # clear page.
-	my @files = FIO::dir2arr("./","txt"); # get list of .txt files
-	my ($listbox, $delaybox, $sizer,%images);
-	$imgpage->insert( Label => text => "Describing", pack => { fill => 'x', expand => 0}, backColor => PGK::convertColor($bgcol), );
-	my $filebox = labelBox($imgpage,"Seconds between fetches",'filechoice','H', boxfill => 'none', boxex => 0, labfill => 'x', labex => 0);
-	$filebox->set(backColor => PGK::convertColor($bgcol));
-#	my $fnb = $filebox->insert( InputLine => name => 'thisfile');
-#	my $dl = $filebox->insert( Label => text => "Seconds between fetches");
-	$delaybox = $filebox->insert( SpinEdit => name => 'cooldown', max => 600, min => 0, step => 5, value => 7);
-	my $sl = $filebox->insert( Label => text => "Size of thumbnails");
-	$sizer = $filebox->insert( SpinEdit => name => 'size', max => 2048, min => 100, step => 50, value => 200);
-	my $lister = $imgpage->insert( VBox => name => "Input", pack => {fill => 'both', expand => 1}, backColor => PGK::convertColor($bgcol), );
-	$lister->insert( Label => text => "Choose a file containing URLs:");
-	foreach my $f (@files) {
-		next if $f =~ /^TODO/; # Not the TODO file
-		$lister->insert( Button => text => $f, onClick => sub { $lister->destroy();
-			my $error = tryLoadInput($imgpage,$f,$delaybox,\%images,$sizer);
-			$error and sayBox(getGUI("mainWin"),"An error occurred trying to load $f.\nPlease check the file to ensure it contains valid URLS, one on each line.");
-		});
-	}
-	$lister->insert( Button => text => "Enter URLS Manually", onClick => sub { $lister->destroy();
-		my $error = tryLoadInput($imgpage,"NONE",$delaybox,\%images,$sizer);
-	});
-	$delaybox->text("7");
-	return 0;
+	return PGUIdesc::resetDescribing(@_);
 }
-print ".";
+
+=item resetGrouping TARGET
+
+Given a TARGET widget, generates the list widgets needed to perform the Grouping page's functions.
+Returns 0 on completion.
+Dies on error opening library directory.
+
+=cut
+
+require PGUIgrou;
+sub resetGrouping {
+	return PGUIgrou::resetGrouping(@_);
+}
+
+=item resetOrdering TARGET
+
+Given a TARGET widget, generates the list widgets needed to perform the Ordering page's functions.
+Returns 0 on completion.
+Dies on error opening library directory.
+
+=cut
+
+require PGUIorde;
+sub resetOrdering {
+	return PGUIorde::resetOrdering(@_);
+}
+
+=item resetPublishing TARGET
+
+Given a TARGET widget, generates the list widgets needed to perform the Publishing page's functions.
+Returns 0 on completion.
+Dies on error opening library directory.
+
+=cut
+
+require PGUIpubl;
+sub resetPublishing {
+	return PGUIpubl::resetPublishing(@_);
+}
+
+=item resetScheduling TARGET
+
+Given a TARGET widget, generates the list widgets needed to perform the Scheduling page's functions.
+Returns 0 on completion.
+Dies on error opening library directory.
+
+=cut
+
+require PGUIsche;
+sub resetScheduling {
+	return PGUIsche::resetScheduling(@_);
+}
 
 =item populateMainWin DBH GUI REFRESH
 
@@ -2220,7 +1018,6 @@ sub devHelp {
 	sayBox($target,"$task is on the developer's TODO list.\nIf you'd like to help, check out the project's GitHub repo at http://github.com/over2sd/castagogue.");
 }
 print ".";
-
 
 print " OK; ";
 1;

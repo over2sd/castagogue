@@ -3,4 +3,4 @@ After saving group and clicking create new group file, then trying to add an ite
 Adding page 0 / 0...DoneCan't locate object method "insert" via package "filename.dsc" (perhaps you forgot to load "filename.dsc"?) at modules/PGUI.pm line 1376.
 can't call method widgetd on ublessed ref PGUI 771 after Produce Sequence button press.
 Subject hash warnings even though save is working properly. See PGUI 416 and 439
-
+bring_to_front on unblessed reference at PGK 1107 after clicking paging buttons in Pager object from Scheduling tab

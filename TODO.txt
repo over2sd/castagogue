@@ -33,3 +33,4 @@ After publishing, give an Exit button in addition to a Continue button.
 Make a function that grabs the object's parent, finds out its bgcolor, and matches it.
 On Grouping tab, change layout so that items can be placed in a group file and row without showing the rows, which can get ungainly.
 Make RRGroups and other data classes capable of loading and saving themselves from files.
+Fix saving of sequences; currently does not save to file.
