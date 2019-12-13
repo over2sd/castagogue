@@ -191,6 +191,7 @@ sub saveItAsIs {
 	my $count = scalar @{ $rss->{items} };
 	print "Now contains $count items.";
 skrDebug::dump($rss->{delete},"Deletions");
+	castRSS::updateTime($rss);
 	($rss->save($ofn) ? $output->push("$ofn saved.") : $output->push("$ofn could not be saved."));
 	unless (FIO::config('Disk','persistentnext')) { print "nextID was " . FIO::cfgrm('Main','nextid',undef); } # reset nextID if we want to get it from the file each time.
 	FIO::saveConf();

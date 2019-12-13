@@ -150,8 +150,7 @@ sub showMonthly {
 	my $bbox = $pane->insert( HBox => name => "buttons", pack => Sui::passData('rowopts') );
 	my $prev = $win->insert( VBox => name => "Autopick", pack => Sui::passData('rowopts'), ); # create a pane
 	my $seqer = $bbox->insert( InputLine => text => $categories[0] . ".seq" );
-	#TODO: Make this refresh month, too.
-	my $catter = $picker->insert( ComboBox => style => cs::DropDown, height => 35, items => \@categories, text => $categories[0], onChange => sub { $seqer->text($_[0]->text . ".seq"); }, );
+	my $catter = $picker->insert( ComboBox => style => cs::DropDown, height => 35, items => \@categories, text => $categories[0], onChange => sub { $seqer->text($_[0]->text . ".seq"); showMonth($calhome,$date,$filarrref,$output,$_[0]->text); }, );
 	my $monther = $picker->insert( ComboBox => style => cs::DropDownList, height => 35, growMode => gm::GrowLoX | gm::GrowLoY, items => $months, onChange => sub { $date->set(month => $_[0]->focusedItem + 1); showMonth($calhome,$date,$filarrref,$output,$catter->text); }, text => $$months[$date->month() - 1], );
 	$picker->insert( SpinEdit => name   => 'Year', min    => 1900, max => 2099, growMode => gm::GrowLoX | gm::GrowLoY, value => $date->year, onChange => sub { $date->set(year => $_[0]->value()); showMonth($calhome,$date,$filarrref,$output,$catter->text); } );
 	$picker->insert( Label => text => " at the regular time " );
@@ -286,6 +285,8 @@ print ".";
 sub showMonth {
 	my @days_in_months = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
 	my ($target,$date,$far,$out,$cat,%args) = @_;
+	my ($schedh,$regh) = @$far;
+	return unless (exists $$schedh{$cat} or exists $$regh{$cat});
 	#TODO: Leap day handling here
 	$target->empty();
 	$out->{days} = []; # clear storage for refresh
@@ -311,7 +312,6 @@ sub showMonth {
 		$weeks[$w]->insert( Button => width=> $butsize, height => $butsize, text => "", );
 		$pos++;
 	}
-	my ($schedh,$regh) = @$far;
 	my ($x1,$y,$m,$x2) = Common::dateConv($date); # DateTime => (datetime,scalar,scalar,scalar)
 	foreach my $d (1 .. $days_in_months[$date->month - 1]) {
 		my $row = $weeks[$w];

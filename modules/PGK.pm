@@ -370,10 +370,13 @@ sub insert {
 	return $child;
 }
 
-sub arrange { # TODO: "reverse" option
+sub arrange {
 	my $self = shift;
+	my $side = "left";
+	my $reverse = shift;
+	$side = "right" if $reverse;
 	foreach ($self->get_widgets()) {
-		$_->pack(side => "left");
+		$_->pack(side => $side);
 	}
 }
 

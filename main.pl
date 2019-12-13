@@ -6,7 +6,7 @@ use utf8;
 
 # castagogue
 my $PROGNAME = "Castagogue";
-my $version = "0.020a";
+my $version = "0.021a";
 
 $|++; # Immediate STDOUT, maybe?
 print "[I] $PROGNAME v$version is running.";
@@ -97,7 +97,7 @@ my $rss = castRSS::prepare($rssfile,$out);
 #print $rss->as_string;
 my $error = castRSS::processRange($rss,$begin,$conclude,$out);
 print "\nNow contains " . $#{$rss->{items}} . " items...";
-# TODO: Update pubDate for feed/channel
+castRSS::updateTime($rss);
 $rss->save($outfile);
 unless (FIO::config('Disk','persistentnext')) {
 	print "nextID was " . FIO::cfgrm('Main','nextid',undef); } # reset nextID if we want to get it from the file each time.

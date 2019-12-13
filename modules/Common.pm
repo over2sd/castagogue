@@ -154,8 +154,8 @@ sub getColors{
 		return "";
 	}
 	my ($index,$hex,$force) = @_;
-	my @colors = ($hex ? ("#aaaaaa","#aa0000","#00aa00","#aa5500","#0000aa","#aa00aa","#00aaaa","#aaaaaa","#ff5555","#55ff55","#ffff55","#5555ff","#ff55ff","#55ffff","#ffffff","#0000ff","#000000","#555555") : ("\033[0;37;40m","\033[0;31;40m","\033[0;32;40m","\033[0;33;40m","\033[0;34;40m","\033[0;35;40m","\033[0;36;40m","\033[1;31;40m","\033[1;32;40m","\033[1;33;40m","\033[1;34;40m","\033[1;35;40m","\033[1;36;40m","\033[1;37;40m","\033[0;34;47m","\033[7;37;40m","\033[1;30;40m"));
 	return '' if ($bwterm && !$force);
+	my @colors = ($hex ? ("#aaaaaa","#aa0000","#00aa00","#aa5500","#0000aa","#aa00aa","#00aaaa","#aaaaaa","#ff5555","#55ff55","#ffff55","#5555ff","#ff55ff","#55ffff","#ffffff","#0000ff","#000000","#555555") : ("\033[0;37;40m","\033[0;31;40m","\033[0;32;40m","\033[0;33;40m","\033[0;34;40m","\033[0;35;40m","\033[0;36;40m","\033[1;31;40m","\033[1;32;40m","\033[1;33;40m","\033[1;34;40m","\033[1;35;40m","\033[1;36;40m","\033[1;37;40m","\033[0;34;47m","\033[7;37;40m","\033[1;30;40m"));
 	if ($index >= scalar @colors) {
 		$index = $index % scalar @colors;
 	}
@@ -171,7 +171,7 @@ sub missing { # useful if multiple values must be checked in one conditional
 	my ($sCat,$blankok) = @_;
 	return 1 unless(defined $sCat); # not defined: TRUE
 	return 1 unless($sCat ne "" || $blankok); # blank: TRUE unless blank is ok.
-	return 0; # defined an not blank: FALSE
+	return 0; # defined and not blank: FALSE
 }
 print ".";
 
@@ -376,7 +376,6 @@ sub errorOut {
 		warn "errorOut called without required parameters";
 		return 1;
 	}
-#		use FIO qw( config ); # TODO: Fail gracefully here (eval?)
 	my $fatal = (defined $args{fatal} ? $args{fatal} : (FIO::config('Main','fatalerr') or 0 ));
 	my $color = (defined $args{color} ? $args{color} : (FIO::config('Debug','termcolors') or 1));
 	my $error = qq{errorOut could not find error code $code associated with $func};
@@ -815,6 +814,7 @@ print ".";
 sub pad { # recipe from perlfaq (READ" pad TEXT to LENGTH with CHAR
 	my ($text,$pad_len,$filler,$after) = @_;
 	# TODO: divide pad_len by length of filler for pad patterns instead of characters.
+	# TODO: remember why the current behavior was inadequate.
 	unless (defined $after and $after) {
 		substr( $text, 0, 0 ) = $filler x ( $pad_len - length( $text ) ); # maybe pl - l(t) / l(f)?
 	} else {

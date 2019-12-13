@@ -102,9 +102,9 @@ sub gz_decom {
 		PGK::sayBox(@_);
 		return 0;
 		}
-#TODO: Make sure the failure return value passes through.
+#TODO: Make sure the failure return value passes through. FIXED?
 	gunzip($ifn => $ofn, Autoclose => 1)
-		or gzfail($window,$GunzipError);
+		or gzfail($window,$GunzipError) or return 0;
 	return 1;
 }
 # TODO: Check this function more thoroughly to see if it does what is expected.

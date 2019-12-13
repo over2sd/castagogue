@@ -32,8 +32,7 @@ sub prepare {
 	$output and $output->push("Contains " . $#{$rss->{items}} . " items...");
 	$pb and $pb->max($#{$rss->{items}} + 1);
 	my $opt;
-# TODO: Replace with context check
-	if ($output and $isgui) { $opt = $output; } # if GUI, send InfMessages to GUI object.
+	unless (Sui::passData('context') eq "CLI") { $opt = $output; } # if GUI, send InfMessages to GUI object.
 	my $itemno = 0;
 	my $nextid = FIO::config('Main','nextid');
 	my $purging = (FIO::config('Disk','purgeRSS') or 0); # only delete old RSS items if the user wants it done.
@@ -550,6 +549,16 @@ sub remove {
 	$rss->{delete} = [] unless defined $rss->{delete};
 	push(@{ $rss->{delete} },$items[$item]->{guid});
 	print "Item $item, $name, marked for deletion.\n";
+}
+print ".";
+
+sub updateTime {
+	my ($rss) = shift;
+	my $tz = Sui::getTZ();
+	my $us = substr(timeAsRSS(DateTime->now),0,-5);
+	$us .= $tz;
+	$rss->channel(pubDate => $us);
+
 }
 print ".";
 
