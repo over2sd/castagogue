@@ -141,6 +141,12 @@ sub showMonthly {
 	$output->{days} = []; # needed for autofill button
 	my %sched = %{ $$filarrref[0] };
 	my @categories = keys %sched;
+	unless (scalar @categories) {
+		@categories = keys %{ $$filarrref[1] }; # we need categories to function!
+		unless (scalar @categories) {
+			@categories = qw( bible ministry special prayers ); # We need default categories as a last resort.
+		}
+	}
 	my $bbox = $pane->insert( HBox => name => "buttons", pack => Sui::passData('rowopts') );
 	my $prev = $win->insert( VBox => name => "Autopick", pack => Sui::passData('rowopts'), ); # create a pane
 	my $seqer = $bbox->insert( InputLine => text => $categories[0] . ".seq" );
@@ -217,10 +223,11 @@ sub showMonthly {
 			foreach my $d (sort keys %dates ) {
 				my %fields = %{ $hash{$c}{$d} };
 				unless (defined $fields{url} && defined $fields{title} && defined $fields{desc} ) {
-skrDebug::dump(\%fields,"Fields");
+					next if (%fields == ()); # if it's empty, not malformed, don't complain.
 					my $es = "Subject hash passed to Save button does not contain all required data " . Common::lineNo(2);
 					print "$es\n";
 					$stat->push($es);
+skrDebug::dump(\%fields,"dated");
 					next;
 				}
 				$fields{desc} =~ s/\s+^//; # trim trailing whitespace
@@ -240,10 +247,11 @@ skrDebug::dump(\%fields,"Fields");
 				foreach my $i ( @{ $hash{$c}{$d} } ) {
 					my %fields = %{ $i };
 					unless (defined $fields{url} && defined $fields{title} && defined $fields{desc} ) {
-skrDebug::dump(\%fields,"Fields");
+						next if (%fields == ());
 						my $es = "Subject hash in ref within Save button does not contain all required data " . Common::lineNo(2);
 						print "$es\n";
 						$stat->push($es);
+skrDebug::dump(\%fields,"regular");
 						next;
 					}
 					push(@lines,"day=" . $d . ">image=" . $fields{url} . ">title=" . $fields{title} . ">desc=" . $fields{desc} . ">time=" . $timestr . ">cat=" . $c . ">");

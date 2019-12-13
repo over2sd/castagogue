@@ -218,41 +218,6 @@ sub generateSequence {
 }
 print ".";
 
-sub itemEditor {
-	my ($ri) = @_;
-	my $optbox = Prima::Dialog->create( centered => 1, borderStyle => bs::Sizeable, onTop => 1, width => 300, height => 300, owner => getGUI('mainWin'), text => "Edit " . $ri->title(), valignment => ta::Middle, alignment => ta::Left,);
-	my $bhigh = 18;
-	my $extras = { height => $bhigh, };
-	my $buttons = mb::Ok;
-	my $context = Sui::passData('context');
-	my $vbox = $optbox->insert( VBox => autowidth => 1, pack => { fill => 'both', expand => 1, anchor => "nw", }, alignment => ta::Left, );
-	my $nb = labelBox($vbox,"Name",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
-	my $lb = labelBox($vbox,"Link",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
-	my $tb = labelBox($vbox,"Text",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
-	my $cb = labelBox($vbox,"Category",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
-	my $ub = labelBox($vbox,"Time",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
-	my $ne = $nb->insert( InputLine => name => 'input', text => $ri->title() );
-	my $le = $lb->insert( InputLine => name => 'input', text => $ri->link() );
-	my $te = $tb->insert( InputLine => name => 'input', text => $ri->text() );
-	my $ce = $cb->insert( InputLine => name => 'input', text => $ri->cat() );
-	my $ue = $ub->insert( InputLine => name => 'input', text => $ri->time() );
-	$nb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->title($ne->text); });
-	$lb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->link($le->text); });
-	$tb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->text($te->text); });
-	$cb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->cat($ce->text); });
-	$ub->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->time($ue->text); });
-	my $spacer = $vbox->insert( Label => text => " ", pack => { fill => 'both', expand => 1 }, );
-	if ($context eq 'library') {
-		my $rb = labelBox($vbox,"Recurrence",'r','H', boxfill => 'y', boxex => 1, labfill => 'x', labex => 1);
-		my $re = $rb->insert( InputLine => name => 'input', text => $ri->get('recur') );
-		$rb->insert( Button => text => "Commit", height => $bhigh, onClick => sub { $ri->set('recur',$re->text); });
-	}
-	my $fresh = Prima::MsgBox::insert_buttons( $optbox, $buttons, $extras); # not reinventing wheel
-	$fresh->set( font => applyFont('button'), );
-	$optbox->execute;
-}
-print ".";
-
 sub rownameEditor {
 	my ($b,$g,$i) = @_;
 	my $optbox = Prima::Dialog->create( centered => 1, borderStyle => bs::Sizeable, onTop => 1, width => 300, height => 100, owner => getGUI('mainWin'), text => "Edit Row Name for " . $b->text(), valignment => ta::Middle, alignment => ta::Left,);
@@ -384,7 +349,7 @@ sub tryLoadGroup {
 		$row->insert( Label => text => " ");
 		foreach my $c (@r) {
 			next unless (ref $c eq "RItem"); # skip bad items
-			$c->widget($row->insert( Button => width => $buttonscale, height => $buttonscale, text => "", hint => $c->text() . " (" . $c->link() . ")", onClick => sub { itemEditor($c); }));
+			$c->widget($row->insert( Button => width => $buttonscale, height => $buttonscale, text => "", hint => $c->text() . " (" . $c->link() . ")", onClick => sub { $c->itemEditor(); }));
 			$c->widget()->set( backColor => PGK::convertColor("#FFF"), );
 		}
 		unless ($i % ($maxrows or FIO::config('UI','buttonrowmax') or 15) or $i == 0) {
@@ -764,7 +729,7 @@ sub makeDescButton {
 print ".";
 
 sub fetchapic { # fetches an image from the cache, or from the server if it's not there.
-	my ($line,$hitserver,$stat,$target) = @_;
+	my ($line,$hitserver,$stat,$target,$nofetch) = @_;
 	unless ($line) {
 		warn "\nUndefined line passed to fetchapic.\n";
 		Common::traceMe(3);
@@ -786,6 +751,7 @@ sub fetchapic { # fetches an image from the cache, or from the server if it's no
 	my $lfp = $thumb . "/";
 	unless (-e $lfp . $img && -f _ && -r _) {
 		$$hitserver = 1;
+		return -2 if $nofetch;
 		$stat->push("Trying to fetch $line ($img)");
 		Pfresh();
 		print("Trying to fetch $line ($img) to $lfp\n");

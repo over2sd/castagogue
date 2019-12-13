@@ -57,6 +57,7 @@ sub outline {
 
 sub dump {
 	my ($ref,$desc,$showref,$args) = @_;
+	defined $showref or $showref = 1;
 	my $desc2 = (defined $desc ? $desc : "Variable");
 	print "$desc2 is a" . (ref($ref) eq "ARRAY" ? "n ARRAY" : " " . ref($ref)) . ".\n" if getBit(1,$showref);
 	print "$desc: " if ((defined $desc) and (getBit(0,$showref) or getBit(2,$showref)));

@@ -30,7 +30,7 @@ sub prepare {
 	my $pccol = ($termcolor ? Common::getColorsbyName("cyan") : "");
 	my $npccol = ($termcolor ? Common::getColorsbyName("ltblue") : "");
 	$output and $output->push("Contains " . $#{$rss->{items}} . " items...");
-	$pb and $pb->max($#{$rss->{items}});
+	$pb and $pb->max($#{$rss->{items}} + 1);
 	my $opt;
 # TODO: Replace with context check
 	if ($output and $isgui) { $opt = $output; } # if GUI, send InfMessages to GUI object.
@@ -38,7 +38,7 @@ sub prepare {
 	my $nextid = FIO::config('Main','nextid');
 	my $purging = (FIO::config('Disk','purgeRSS') or 0); # only delete old RSS items if the user wants it done.
 	my $debug = main::howVerbose();
-	for my $i (@{$rss->{items}}) {
+	foreach my $i (@{$rss->{items}}) {
 		if (defined $pb) {
 			$pb->value($pb->value + 1); # increment progress bar
 			PGK::Pfresh(); # repaint
@@ -128,8 +128,9 @@ sub makeItem {
 	my $gi = getGUID();
 	defined $cat or $cat = 'general';
 	(FIO::config('Main','autotag') or 0) and $desc = "$desc\n#$cat"; # add the category as a hashtag
+	my $tdt = $pdt->day_name;
 	$r->add_item(
-		title		=> ("$title" or qq{$pdt->day_name}),
+		title		=> ("$title" or qq{$tdt}),
 		link		=> "$url",
 		pubDate		=> ("$pub" or "$pds"),
 		guid		=> "$gi",
@@ -185,12 +186,16 @@ sub processDatedFile {
 				my ($ldate,$limg,$ltitle,$ldesc,$ltime,$lcat);
 				$ldate = $1 if $line =~ /date=(\d{4}-\d{2}-\d{2})>/;
 # TODO: validity checking
+				unless (defined $1) {
+					0 and print "...skipping undated line...";
+					next;
+				}
 				my $d = DateTime::Format::DateParse->parse_datetime( $ldate );
 				my $rdate = substr(timeAsRSS($d),0,-15);
-				my $ti = RItem->new(date => "$rdate");
+				$ltitle = $1 if $line =~ /title=([\d:\w\s]+)>/;
+				my $ti = RItem->new(date => "$rdate", title => $ltitle);
 				my $ed = $d + $lead; # so we can add to it without losing our place.
 				$limg = $1 if $line =~ /image=(.+?)>/;
-				$ltitle = $1 if $line =~ /title=([\w\s]+)>/;
 				$ldesc = $1 if $line =~ /desc=(.+?)>/;
 				$ltime = $1 if $line =~ /time=(\d{3,4})>/;
 				$lcat = $1 if $line =~ /cat=(\w+?)>/;
@@ -201,7 +206,7 @@ sub processDatedFile {
 				$ti->name($ltitle);
 				$ti->time(sprintf("%04i",$ltime));
 				$ti->category($lcat);
-print $ti->name;
+$ti->set(meta => "dated");
 				$items{$ldate} = [] unless exists $items{$ldate};
 				push(@{$items{$ldate}},$ti); # store record
 				if ($pb) { # increment operations and completion
@@ -273,6 +278,7 @@ sub processFile {
 		} else {
 			my $rdate = substr(timeAsRSS($d),0,-15);
 			my $ti = RItem->new(date => "$rdate");
+$ti->set('meta',"processFile");
 			my $descact = 0;
 			my $ed = $d + DateTime::Duration->new( days=> (FIO::config('Main','eventlead') or 0)); # so we can add to it without losing our place.
 
@@ -355,10 +361,11 @@ sub processFile {
 					print $fn;
 					$ed = $d + DateTime::Duration->new( days=> (FIO::config('Main','eventlead') or 0)); # so we can add to it without losing our place.
 					$ti = RItem->new(date => "$rdate"); # start new record, in case there are more items in this file
+$ti->set('meta',"processFile");
 				} elsif ($k eq "defer" || $k eq "defered") { # temporary hide
 					next; # The user just wants this to be hidden, for now.
 				} else { # Oops! Error.
-					warn "\n[W] I found unexpected keyword $k with value $2.\n";
+					warn "\n[W] I found unexpected keyword $k with value $2. ($fn)\n";
 				}
 			}
 			close($fh); # close file
@@ -516,10 +523,10 @@ sub processRange {
 	my $length = $ds - $dp;
 	my $diff = $length->days;
 	$pb and $pb->max(($diff * 6) + 2);
-	PGK::Pfresh();
+	$pb and PGK::Pfresh();
 	my %items = catalogRSS($r); # grab item titles to prevent duplication.
-	$pb->value($pb->value() + 1);
-	PGK::Pfresh();
+	$pb and $pb->value($pb->value() + 1);
+	$pb and PGK::Pfresh();
 #use Data::Dumper; print Dumper \%items;
 	my %dated = processDatedFile("dated.txt",\%items,$out,$opt);
 #print ";;;" . Dumper %dated;
@@ -532,6 +539,17 @@ sub processRange {
 		$pb and PGK::Pfresh();
 	}
 	return 0;
+}
+print ".";
+
+sub remove {
+	my ($rss,$item) = @_;
+	my @items = @{ $rss->{items} };
+	my $name = $items[$item]->{title};
+	$rss->{items} = \@items;
+	$rss->{delete} = [] unless defined $rss->{delete};
+	push(@{ $rss->{delete} },$items[$item]->{guid});
+	print "Item $item, $name, marked for deletion.\n";
 }
 print ".";
 

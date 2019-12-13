@@ -5,7 +5,7 @@ print __PACKAGE__;
 
 require Exporter;
 @ISA = qw(Exporter);
-@EXPORT_OK = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox Pdie Pwait Pager Pfresh labeledRow labeledCol calButton);
+@EXPORT_OK = qw( ColorRow FontRow VBox HBox Table applyFont getGUI convertColor labelBox sayBox Pdie Pwait Pager Pfresh labeledRow labeledCol calButton getPColors );
 use Prima qw(Application Buttons MsgBox FrameSet);
 
 use FIO qw( config );
@@ -2001,6 +2001,11 @@ print ".";
 
 sub growRow {
 	return grow(shift, boxfill=> 'x', boxex => 1, @_);
+}
+print ".";
+
+sub getPColors {
+	return convertColor(Common::getColors(($_[0]),1,1));
 }
 print ".";
 

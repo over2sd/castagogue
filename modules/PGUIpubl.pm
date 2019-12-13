@@ -112,30 +112,35 @@ $text");
 	my $status = getGUI('status');
 	Sui::storeData('opo',$output);
 	Sui::storeData('progress',$probar1);
+	1 and print "Preparing...";
 	my $rss = castRSS::prepare($ifn,$output,1);
 	my @existing = @{$rss->{items}}; # copy existing
 	# update main progress bar
 	$probar1->value($probar1->max()); # no matter what, we've left the prepare() function, so we're done with that.
+	Pfresh();
 	$probar3->max($probar1->max + $probar2->max);
 	$probar3->value($probar1->value + $probar2->value);
 	Pfresh();
 	Sui::storeData('progress',$probar2);
+	1 and print "Processing...";
 	my $error = castRSS::processRange($rss,$start,$end,$output,1);
 	# update main progress bar
 	$probar2->value($probar2->max()); # no matter what, we've left processRange(), so we're done with that step.
 	$probar3->max($probar1->max + $probar2->max);
 	$probar3->value($probar1->value + $probar2->value);
-	$output->push("Now contains " . $#{$rss->{items}} . " items...");
+	$output->push("Now contains " . scalar @{$rss->{items}} . " items...");
 #print $rss->as_string;
 	if (FIO::config('UI','preview')) {
+		1 and print "Previewing...";
 		$output->push("Loading items for review (see below).");
 		Pfresh();
-		my $review = $target->insert( VBox => name => 'review', pack => { fill => 'both', expand => 1 });# VBox to hold RItems
-		$review->insert( Label => text => "Reviewing RSS feed is not yet coded. Sorry." );
-############### MARKER #############
+		my $review = $target->insert( VBox => name => 'review', pack => { fill => 'x', expand => 0 });# VBox to hold RItems
+		# TODO: make sure this VBox has scrolling capability
 		$rss = previewRSS($rss,$review,$pbbox,$output,@existing); # each existing RSS item will be loaded, given a different background color than generated items.
 		# save button to write items to RSS
-		$target->insert( Button => text => "Save", onClick => sub { $_[0]->destroy(); saveItAsIs($rss,$ofn,$output,$target,$bgcol); } );
+############### MARKER #############
+		$target->insert( Button => text => "Save", onClick => sub { $_[0]->destroy(); saveItAsIs($rss,$ofn,$output,$target,$bgcol); $review->destroy(); } );
+		select()->flush();
 		Pfresh();
 	} else {
 		Pfresh();
@@ -148,12 +153,33 @@ sub previewRSS {
 	my ($rss,$to,$gb,$out,@existing) = @_;
 	my $bg = Sui::passData('background');
 	my $bg2 = 0;
-############# MARKER #############
-skrDebug::dump(\@existing,"Existing");
-	# each existing RSS item will be loaded, given a different background color than generated items.
-	# each RItem row should have a button to remove that item.
-	# each RItem should have buttons to edit values.
-	Pfresh();
+	my $vs = 32;
+	sub makeReviewRow {
+		my ($x,$ob,$viewsize,$color,%args) = @_;
+		next unless (defined $x and defined $$x{link});
+		my $ri = RItem->new( guid => $$x{guid}, title => $$x{title}, text => $$x{description}, link => $$x{link}, cat => $$x{category}, gob => $row, );
+		my $date = ($$x{pubDate} or "Undefined");
+		$ri->pubDate($date);
+		my $row = $ob->insert( HBox => name => "row", backColor => $color, height => $viewsize + 7, );
+		PGK::growRow($row);
+		my $hits;
+		$ri->toReviewRow($row,$ob,$viewsize,$color,%args);
+		Pfresh();
+	}
+	my @ids = (0,);
+	my $bgc1 = PGK::getPColors(12); # color
+	my $bgc2 = PGK::getPColors(13);
+	my $bgc = $bgc2;
+	foreach my $i (@existing) {
+		push(@ids,$$i{guid}); # store these to recolor existing rows later
+	}
+	my $ino = 0;
+	foreach my $i (@{ $rss->{items}}) {
+		unless (Common::findIn($$i{guid},@ids) == -1) { $bgc = $bgc1; }; # check for precendence and recolor
+		makeReviewRow($i,$to,$vs,$bgc, rss => $rss, item => $ino );
+		$ino++;
+		$bgc = $bgc2;
+	}
 	$gb->destroy(); # kill the gauge box
 	return $rss;
 }
@@ -161,6 +187,10 @@ print ".";
 
 sub saveItAsIs {
 	my ($rss,$ofn,$output,$target,$bgcol) = @_;
+############# MARKER #############
+	my $count = scalar @{ $rss->{items} };
+	print "Now contains $count items.";
+skrDebug::dump($rss->{delete},"Deletions");
 	($rss->save($ofn) ? $output->push("$ofn saved.") : $output->push("$ofn could not be saved."));
 	unless (FIO::config('Disk','persistentnext')) { print "nextID was " . FIO::cfgrm('Main','nextid',undef); } # reset nextID if we want to get it from the file each time.
 	FIO::saveConf();
